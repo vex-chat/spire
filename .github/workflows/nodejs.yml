@@ -1,0 +1,55 @@
+# This workflow will do a clean install of dependencies, and compile the typescript.
+
+name: typescript_ci
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ["14"]
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        always-auth: true
+        node-version: ${{ matrix.node-version }}
+        registry-url: "https://npm.pkg.github.com"
+        scope: "@vex-chat"
+
+    - name: Setup Cache
+      uses: actions/cache@v1
+      with:
+        path: node_modules
+        key: ${{ matrix.os }}-deps
+
+    - name: Install Dependencies
+      run: yarn --network-concurrency 1
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.CI_KEY }}
+
+    - name: Build
+      run: yarn build
+
+    - name: Prepare Build Artifact
+      id: before_deploy
+      shell: bash
+      run: |
+        export FILE_NAME=(dist)
+        echo ::set-output name=file_name::${FILE_NAME}
+    - name: Store Build Artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: ${{ steps.before_deploy.outputs.file_name }}
+        path: ${{ steps.before_deploy.outputs.file_name }}

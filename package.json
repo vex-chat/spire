@@ -1,0 +1,61 @@
+{
+    "name": "@vex-chat/vex-server-js",
+    "version": "0.1.1",
+    "description": "Vex server implementation in NodeJS.",
+    "main": "./dist/index.js",
+    "author": "Extra <extrahash@protonmail.com>",
+    "license": "UNLICENSED",
+    "private": true,
+    "scripts": {
+        "start": "node ./dist/index.js",
+        "build": "node ./node_modules/typescript/bin/tsc",
+        "prettier": "node ./node_modules/prettier/bin-prettier.js '**/*.{ts,tsx,json,md}' --tab-width 4 --trailing-comma es5 --ignore-path .gitignore  --arrow-parens always --write",
+        "lint": "./node_modules/tslint/bin/tslint src/**/*.ts{,x}",
+        "lint-fix": "./node_modules/tslint/bin/tslint src/**/*.ts{,x} --fix"
+    },
+    "devDependencies": {
+        "husky": "^3.1.0",
+        "lint-staged": "^9.5.0",
+        "prettier": "^1.19.1",
+        "tslint": "^5.20.1",
+        "tslint-config-prettier": "^1.18.0",
+        "typescript": "^3.7.2"
+    },
+    "lint-staged": {
+        "src/**/*.{ts}": [
+            "./node_modules/tslint/bin/tslint -c tslint.json --fix",
+            "git add"
+        ]
+    },
+    "husky": {
+        "hooks": {
+            "pre-commit": "yarn prettier; git add --all; lint-staged"
+        }
+    },
+    "dependencies": {
+        "@extrahash/sleep": "^1.0.0",
+        "@types/chalk": "^2.2.0",
+        "@types/cors": "^2.8.8",
+        "@types/express": "^4.17.9",
+        "@types/morgan": "^1.9.2",
+        "@types/msgpack-lite": "^0.1.7",
+        "@types/uuid": "^8.3.0",
+        "@types/ws": "^7.4.0",
+        "@vex-chat/crypto-js": "^0.7.3",
+        "@vex-chat/types-js": "^0.7.2",
+        "chalk": "^4.1.0",
+        "cors": "^2.8.5",
+        "dotenv": "^8.2.0",
+        "electron-log": "^4.1.1",
+        "express": "^4.17.1",
+        "helmet": "^4.2.0",
+        "knex": "^0.21.12",
+        "morgan": "^1.10.0",
+        "msgpack-lite": "^0.1.26",
+        "mysql": "^2.18.1",
+        "sqlite": "^4.0.17",
+        "tweetnacl": "^1.0.3",
+        "uuid": "^8.3.1",
+        "ws": "^7.4.0"
+    }
+}
