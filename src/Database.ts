@@ -235,33 +235,41 @@ export class Database {
         }
     }
 
+    // the identifier can be username, public key, or userID
     public async retrieveUser(
-        userIDorPubkey: string
+        userIdentifier: string
     ): Promise<XTypes.SQL.IUser | null> {
-        if (uuid.validate(userIDorPubkey)) {
+        if (uuid.validate(userIdentifier)) {
             const user = await this.db
                 .from("users")
                 .select()
-                .where({ userID: userIDorPubkey })
+                .where({ userID: userIdentifier })
+                .limit(1);
+            if (!user) {
+                return null;
+            }
+            return user[0];
+        } else if (pubkeyRegex.test(userIdentifier)) {
+            const user = await this.db
+                .from("users")
+                .select()
+                .where({ signKey: userIdentifier })
                 .limit(1);
             if (!user) {
                 return null;
             }
             return user[0];
         } else {
-            if (pubkeyRegex.test(userIDorPubkey)) {
-                const user = await this.db
-                    .from("users")
-                    .select()
-                    .where({ signKey: userIDorPubkey })
-                    .limit(1);
-                if (!user) {
-                    return null;
-                }
-                return user[0];
+            const user = await this.db
+                .from("users")
+                .select()
+                .where({ username: userIdentifier })
+                .limit(1);
+            if (!user) {
+                return null;
             }
+            return user[0];
         }
-        return null;
     }
 
     public async saveMail(
