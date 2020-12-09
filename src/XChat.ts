@@ -11,6 +11,9 @@ import WebSocket from "ws";
 import { ClientManager } from "./ClientManager";
 import { Database } from "./Database";
 
+// expiry of regkeys
+const EXPIRY_TIME = 10000;
+
 export class XChat {
     private db = new Database();
     private wss = new WebSocket.Server({
@@ -46,6 +49,12 @@ export class XChat {
         return key;
     }
 
+    private deleteRegKey(key: XTypes.HTTP.IRegKey) {
+        if (this.regKeys.includes(key)) {
+            this.regKeys.splice(this.regKeys.indexOf(key), 1)
+        }
+    }
+
     private validRegKey(key: string) {
         log.info("Validating regkey: " + key);
         for (const rKey of this.regKeys) {
@@ -53,9 +62,9 @@ export class XChat {
                 const age =
                     new Date(Date.now()).getTime() - rKey.time.getTime();
                 log.info("Regkey found, " + age + " ms old.");
-                if (age < 10000) {
+                if (age < EXPIRY_TIME) {
                     log.info("Regkey is valid.");
-                    this.regKeys.splice(this.regKeys.indexOf(rKey), 1);
+                    this.deleteRegKey(rKey);
                     return true;
                 } else {
                     log.info("Regkey is expired.");
@@ -113,6 +122,11 @@ export class XChat {
                 log.info("New regkey requested.");
                 const regKey = this.createRegKey();
                 log.info("New regkey created: " + regKey.key);
+
+                setTimeout(() => {
+                    this.deleteRegKey(regKey);
+                }, EXPIRY_TIME)
+
                 return res.status(201).send(regKey);
             } catch (err) {
                 log.error(err.toString());
