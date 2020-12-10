@@ -51,7 +51,7 @@ export class XChat {
 
     private deleteRegKey(key: XTypes.HTTP.IRegKey) {
         if (this.regKeys.includes(key)) {
-            this.regKeys.splice(this.regKeys.indexOf(key), 1)
+            this.regKeys.splice(this.regKeys.indexOf(key), 1);
         }
     }
 
@@ -113,7 +113,7 @@ export class XChat {
             if (user) {
                 return res.send(user);
             } else {
-                res.status(404);
+                res.sendStatus(404);
             }
         });
 
@@ -125,7 +125,7 @@ export class XChat {
 
                 setTimeout(() => {
                     this.deleteRegKey(regKey);
-                }, EXPIRY_TIME)
+                }, EXPIRY_TIME);
 
                 return res.status(201).send(regKey);
             } catch (err) {
