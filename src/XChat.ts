@@ -161,13 +161,31 @@ export class XChat {
                     if (err !== null) {
                         switch ((err as any).code) {
                             case "ER_DUP_ENTRY":
-                                log.info(err.toString());
+                                console.log(err.toString());
+                                const usernameConflict = err
+                                    .toString()
+                                    .includes("users_username_unique");
+                                const signKeyConflict = err
+                                    .toString()
+                                    .includes("users_signkey_unique");
+
                                 log.warn(
                                     "User attempted to register duplicate account."
                                 );
+                                if (usernameConflict) {
+                                    res.status(400).send({
+                                        error:
+                                            "Username is already registered.",
+                                    });
+                                }
+                                if (signKeyConflict) {
+                                    res.status(400).send({
+                                        error:
+                                            "Public key is already registered.",
+                                    });
+                                }
                                 res.status(400).send({
-                                    error:
-                                        "Either username or public key is already taken.",
+                                    error: "An error occurred registering.",
                                 });
                                 break;
                             default:
@@ -182,6 +200,10 @@ export class XChat {
                         log.info("Registration success.");
                         res.send(user);
                     }
+                } else {
+                    res.status(400).send({
+                        error: "Invalid or no regkey supplied.",
+                    });
                 }
             } catch (err) {
                 log.error("error registering user:", err.toString());
