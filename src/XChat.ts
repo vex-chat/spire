@@ -14,6 +14,8 @@ import { Database } from "./Database";
 // expiry of regkeys
 const EXPIRY_TIME = 10000;
 
+const usernameRegex = /^(\w{3,19})$/;
+
 export class XChat {
     private db = new Database();
     private wss = new WebSocket.Server({
@@ -134,13 +136,15 @@ export class XChat {
             }
         });
 
+        // 19 char max limit for username
         this.api.post("/register/new", async (req, res) => {
             try {
                 const regPayload: XTypes.HTTP.IRegPayload = req.body;
 
-                if (regPayload.username.length < 3) {
+                if (!usernameRegex.test(regPayload.username)) {
                     res.status(400).send({
-                        error: "Username must be at least three characters.",
+                        error:
+                            "Username must be between three and nineteen letters, digits, or underscores.",
                     });
                     return;
                 }
@@ -157,6 +161,7 @@ export class XChat {
                     if (err !== null) {
                         switch ((err as any).code) {
                             case "ER_DUP_ENTRY":
+                                log.info(err.toString());
                                 log.warn(
                                     "User attempted to register duplicate account."
                                 );
