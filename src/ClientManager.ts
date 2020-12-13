@@ -14,6 +14,7 @@ import {
 import WebSocket from "ws";
 import { Database } from "./Database";
 import { createUint8UUID } from "./utils/createUint8UUID";
+import { EXPIRY_TIME } from "./XChat";
 
 log.transports.console.level = "info";
 console.log = log.log;
@@ -323,6 +324,11 @@ export class ClientManager extends EventEmitter {
 
     private initListeners() {
         this.conn.on("open", () => {
+            setTimeout(() => {
+                if (!this.authed) {
+                    this.conn.close();
+                }
+            }, EXPIRY_TIME);
             this.pingLoop();
         });
         this.conn.on("close", () => {

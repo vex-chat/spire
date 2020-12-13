@@ -12,7 +12,7 @@ import { ClientManager } from "./ClientManager";
 import { Database } from "./Database";
 
 // expiry of regkeys
-const EXPIRY_TIME = 10000;
+export const EXPIRY_TIME = 10000;
 
 const usernameRegex = /^(\w{3,19})$/;
 
@@ -161,7 +161,6 @@ export class XChat {
                     if (err !== null) {
                         switch ((err as any).code) {
                             case "ER_DUP_ENTRY":
-                                console.log(err.toString());
                                 const usernameConflict = err
                                     .toString()
                                     .includes("users_username_unique");
@@ -177,12 +176,14 @@ export class XChat {
                                         error:
                                             "Username is already registered.",
                                     });
+                                    return;
                                 }
                                 if (signKeyConflict) {
                                     res.status(400).send({
                                         error:
                                             "Public key is already registered.",
                                     });
+                                    return;
                                 }
                                 res.status(400).send({
                                     error: "An error occurred registering.",
