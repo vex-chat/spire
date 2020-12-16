@@ -248,6 +248,7 @@ export class ClientManager extends EventEmitter {
                     }
                 }
                 break;
+            // this is the global userlist
             case "users":
                 if (msg.action === "RETRIEVE") {
                     try {
@@ -255,6 +256,43 @@ export class ClientManager extends EventEmitter {
                         this.sendSuccess(msg.transmissionID, users);
                     } catch (err) {
                         log.error(err);
+                        this.sendErr(msg.transmissionID, err.toString());
+                    }
+                }
+                break;
+            // this is a single channel userlist
+            case "userlist":
+                if (msg.action === "RETRIEVE") {
+                    const channelID: string = msg.data;
+                    try {
+                        const channel = await this.db.retrieveChannel(
+                            channelID
+                        );
+                        if (!channel) {
+                            this.sendErr(
+                                msg.transmissionID,
+                                "That channel doesn't exist."
+                            );
+                            break;
+                        }
+                        const permissions = await this.db.retrievePermissions(
+                            this.getUser().userID,
+                            "server"
+                        );
+                        for (const permission of permissions) {
+                            if (permission.resourceID === channel.serverID) {
+                                // we've got the permission, it's ok to give them the userlist
+                                const groupMembers = await this.db.retrieveGroupMembers(
+                                    channelID
+                                );
+                                this.sendSuccess(
+                                    msg.transmissionID,
+                                    groupMembers
+                                );
+                                break;
+                            }
+                        }
+                    } catch (err) {
                         this.sendErr(msg.transmissionID, err.toString());
                     }
                 }
@@ -298,19 +336,18 @@ export class ClientManager extends EventEmitter {
                     }
                 }
                 if (msg.action === "CREATE") {
+                    const mail: XTypes.WS.IMail = msg.data;
                     try {
+                        console.log(mail);
+
                         await this.db.saveMail(
-                            msg.data,
+                            mail,
                             header,
                             this.getUser().userID
                         );
                         log.info("Received mail for " + msg.data.recipient);
                         this.sendSuccess(msg.transmissionID, null);
-                        this.notify(
-                            msg.data.recipient,
-                            "mail",
-                            msg.transmissionID
-                        );
+                        this.notify(mail.recipient, "mail", msg.transmissionID);
                     } catch (err) {
                         log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());

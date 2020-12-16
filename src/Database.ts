@@ -134,6 +134,44 @@ export class Database {
         return permission;
     }
 
+    public async retrieveGroupMembers(
+        channelID: string
+    ): Promise<XTypes.SQL.IUser[]> {
+        const channel = await this.retrieveChannel(channelID);
+        if (!channel) {
+            return [];
+        }
+        const permissions: XTypes.SQL.IPermission[] = await this.db
+            .from("permissions")
+            .select()
+            .where({ resourceID: channel.serverID });
+
+        const groupMembers: XTypes.SQL.IUser[] = [];
+        for (const permission of permissions) {
+            const user = await this.retrieveUser(permission.userID);
+            if (user) {
+                groupMembers.push(user);
+            }
+        }
+
+        return groupMembers;
+    }
+
+    public async retrieveChannel(
+        channelID: string
+    ): Promise<XTypes.SQL.IChannel | null> {
+        const channels: XTypes.SQL.IChannel[] = await this.db
+            .from("channels")
+            .select()
+            .where({ channelID })
+            .limit(1);
+
+        if (channels.length === 0) {
+            return null;
+        }
+        return channels[0];
+    }
+
     public async retrieveChannels(
         serverID: string
     ): Promise<XTypes.SQL.IChannel[]> {
@@ -296,6 +334,7 @@ export class Database {
             extra: XUtils.encodeHex(mail.extra),
             header: XUtils.encodeHex(header),
             time: new Date(Date.now()),
+            group: mail.group ? XUtils.encodeHex(mail.group) : undefined,
         };
 
         await this.db("mail").insert(entry);
@@ -320,6 +359,7 @@ export class Database {
                 nonce: XUtils.decodeHex(row.nonce),
                 extra: XUtils.decodeHex(row.extra),
                 sender: row.sender,
+                group: row.group ? XUtils.decodeHex(row.group) : undefined,
             };
             const msgh = XUtils.decodeHex(row.header);
             return [msgh, msgb];
