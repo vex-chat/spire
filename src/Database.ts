@@ -130,6 +130,7 @@ export class Database {
             resourceID,
             powerLevel,
         };
+
         await this.db("permissions").insert(permission);
         return permission;
     }
@@ -216,6 +217,13 @@ export class Database {
         userID: string,
         resourceType: string
     ): Promise<XTypes.SQL.IPermission[]> {
+        if (resourceType === "all") {
+            const sList = await this.db
+                .from("permissions")
+                .select()
+                .where({ userID });
+            return sList;
+        }
         const serverList = await this.db
             .from("permissions")
             .select()
