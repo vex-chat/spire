@@ -234,10 +234,17 @@
     msgpack-lite "^0.1.26"
     tweetnacl "^1.0.3"
 
-"@vex-chat/types-js@^0.7.0", "@vex-chat/types-js@^0.7.2":
+"@vex-chat/types-js@^0.7.0":
   version "0.7.2"
   resolved "https://npm.pkg.github.com/download/@vex-chat/types-js/0.7.2/8762c145fb16b6e27c68744d6a2ff3ee69a139fe01b757a2c09cf66685daa3d7#bdb3587b35279789051baf54e4a96c72e1144442"
   integrity sha512-p+WHBnkUtDEysKGweq/4OxatVMC7dA9rVjX2f43kpwNuQKwk00dBXMwp20i6oo6h5zkBpd4DAdRQiryenmmD/A==
+  dependencies:
+    tweetnacl "^1.0.3"
+
+"@vex-chat/types-js@^0.7.7":
+  version "0.7.7"
+  resolved "https://npm.pkg.github.com/download/@vex-chat/types-js/0.7.7/38dc0c1c932f10fbf82cf19d9b20f944afe5038367a50833fc639656abcef070#e1e0562166493ba7e95dd57ae00c3a8aeabfe939"
+  integrity sha512-fQXjUtA9HnSlxfEvNrZx3UTNPl3gMrqf/al938jXl2aoDaNPZoFAeLl7PkAzAC9V65suHmtmJGJr8D5AdXaHBg==
   dependencies:
     tweetnacl "^1.0.3"
 

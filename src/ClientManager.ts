@@ -20,6 +20,10 @@ log.transports.console.level = "info";
 console.log = log.log;
 console.error = log.error;
 
+const POWER_LEVELS = {
+    CREATE: 50,
+};
+
 function emptyHeader() {
     return new Uint8Array(32);
 }
@@ -311,6 +315,62 @@ export class ClientManager extends EventEmitter {
                         log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
+                }
+                break;
+            case "servers":
+                if (msg.action === "RETRIEVE") {
+                    const servers = await this.db.retrieveServers(
+                        this.getUser().userID
+                    );
+                    this.sendSuccess(msg.transmissionID, servers);
+                }
+                if (msg.action === "CREATE") {
+                    const server = await this.db.createServer(
+                        msg.data!,
+                        this.getUser().userID
+                    );
+                    this.sendSuccess(msg.transmissionID, server);
+                }
+                break;
+            case "channels":
+                if (msg.action === "RETRIEVE") {
+                    const permissions = await this.db.retrievePermissions(
+                        this.getUser().userID,
+                        "server"
+                    );
+                    for (const permission of permissions) {
+                        if (msg.data === permission.resourceID) {
+                            const channels = await this.db.retrieveChannels(
+                                permission.resourceID
+                            );
+                            this.sendSuccess(msg.transmissionID, channels);
+                            break;
+                        }
+                    }
+                    this.sendSuccess(msg.transmissionID, []);
+                }
+                if (msg.action === "CREATE") {
+                    const { serverID, name } = msg.data;
+                    const permissions = await this.db.retrievePermissions(
+                        this.getUser().userID,
+                        "server"
+                    );
+                    for (const permission of permissions) {
+                        if (
+                            permission.resourceID === serverID &&
+                            permission.powerLevel > POWER_LEVELS.CREATE
+                        ) {
+                            const channel = await this.db.createChannel(
+                                name,
+                                serverID
+                            );
+                            this.sendSuccess(msg.transmissionID, channel);
+                        }
+                    }
+                    this.sendErr(
+                        msg.transmissionID,
+                        "You don't have permission to do that."
+                    );
                 }
                 break;
             default:

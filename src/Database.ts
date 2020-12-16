@@ -134,6 +134,16 @@ export class Database {
         return permission;
     }
 
+    public async retrieveChannels(
+        serverID: string
+    ): Promise<XTypes.SQL.IChannel[]> {
+        const channels: XTypes.SQL.IChannel[] = await this.db
+            .from("channels")
+            .select()
+            .where({ serverID });
+        return channels;
+    }
+
     public async createChannel(
         name: string,
         serverID: string
@@ -352,6 +362,7 @@ export class Database {
                 table.string("sender");
                 table.string("header");
                 table.string("cipher");
+                table.string("group");
                 table.text("extra");
                 table.integer("mailType");
                 table.dateTime("time");
@@ -379,6 +390,7 @@ export class Database {
             await this.db.schema.createTable("servers", (table) => {
                 table.string("serverID").primary();
                 table.string("name");
+                table.string("icon");
             });
         }
         if (!(await this.db.schema.hasTable("channels"))) {
