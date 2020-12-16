@@ -338,8 +338,6 @@ export class ClientManager extends EventEmitter {
                 if (msg.action === "CREATE") {
                     const mail: XTypes.WS.IMail = msg.data;
                     try {
-                        console.log(mail);
-
                         await this.db.saveMail(
                             mail,
                             header,
