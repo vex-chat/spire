@@ -238,6 +238,12 @@ export class ClientManager extends EventEmitter {
                                         msg.transmissionID,
                                         newPerm
                                     );
+                                    // notify the user of their new permission
+                                    this.notify(
+                                        userID,
+                                        "permission",
+                                        msg.transmissionID
+                                    );
                                     break;
                                 }
                             }
