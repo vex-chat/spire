@@ -54,7 +54,8 @@ export class ClientManager extends EventEmitter {
     private notify: (
         userID: string,
         event: string,
-        transmissionID: string
+        transmissionID: string,
+        data?: any
     ) => void;
 
     constructor(
@@ -242,7 +243,8 @@ export class ClientManager extends EventEmitter {
                                     this.notify(
                                         userID,
                                         "permission",
-                                        msg.transmissionID
+                                        msg.transmissionID,
+                                        newPerm
                                     );
                                     break;
                                 }

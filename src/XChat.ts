@@ -29,13 +29,19 @@ export class XChat {
         this.init();
     }
 
-    private notify(userID: string, event: string, transmissionID: string) {
+    private notify(
+        userID: string,
+        event: string,
+        transmissionID: string,
+        data?: any
+    ) {
         for (const client of this.clients) {
             if (client.getUser().userID === userID) {
                 const msg: XTypes.WS.INotifyMsg = {
                     transmissionID,
                     type: "notify",
                     event,
+                    data,
                 };
                 client.send(msg);
             }
