@@ -334,6 +334,7 @@ export class Database {
         senderID: string
     ): Promise<void> {
         const entry: XTypes.SQL.IMail = {
+            mailID: mail.mailID,
             mailType: mail.mailType,
             recipient: mail.recipient,
             sender: senderID,
@@ -368,6 +369,7 @@ export class Database {
                 extra: XUtils.decodeHex(row.extra),
                 sender: row.sender,
                 group: row.group ? XUtils.decodeHex(row.group) : undefined,
+                mailID: row.mailID,
             };
             const msgh = XUtils.decodeHex(row.header);
             return [msgh, msgb];
@@ -407,6 +409,7 @@ export class Database {
             await this.db.schema.createTable("mail", (table) => {
                 table.string("nonce").primary();
                 table.string("recipient").index();
+                table.string("mailID");
                 table.string("sender");
                 table.string("header");
                 table.string("cipher");
