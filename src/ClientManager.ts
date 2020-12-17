@@ -225,6 +225,7 @@ export class ClientManager extends EventEmitter {
                             this.getUser().userID,
                             "all"
                         );
+                        let found = false;
                         for (const perm of userHeldPerms) {
                             if (perm.resourceID === resourceID) {
                                 if (perm.powerLevel > POWER_LEVELS.CREATE) {
@@ -246,15 +247,17 @@ export class ClientManager extends EventEmitter {
                                         msg.transmissionID,
                                         newPerm
                                     );
+                                    found = true;
                                     break;
                                 }
                             }
                         }
-
-                        this.sendErr(
-                            msg.transmissionID,
-                            "You don't have permission for that."
-                        );
+                        if (!found) {
+                            this.sendErr(
+                                msg.transmissionID,
+                                "You don't have permission for that."
+                            );
+                        }
                         break;
                     } catch (err) {
                         this.sendErr(msg.transmissionID, err.toString());
