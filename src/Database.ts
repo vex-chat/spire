@@ -363,13 +363,13 @@ export class Database {
         ) => [Uint8Array, XTypes.WS.IMail] = (row) => {
             const msgb: XTypes.WS.IMail = {
                 mailType: row.mailType,
+                mailID: row.mailID,
                 recipient: row.recipient,
                 cipher: XUtils.decodeHex(row.cipher),
                 nonce: XUtils.decodeHex(row.nonce),
                 extra: XUtils.decodeHex(row.extra),
                 sender: row.sender,
                 group: row.group ? XUtils.decodeHex(row.group) : null,
-                mailID: row.mailID,
             };
             const msgh = XUtils.decodeHex(row.header);
             return [msgh, msgb];
