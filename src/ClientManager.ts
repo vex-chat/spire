@@ -371,6 +371,8 @@ export class ClientManager extends EventEmitter {
                             this.getUser().userID
                         );
                         for (const mail of inbox) {
+                            console.log(mail);
+
                             const [mailHeader, mailBody] = mail;
                             this.sendSuccess(
                                 msg.transmissionID,
@@ -386,6 +388,9 @@ export class ClientManager extends EventEmitter {
                 }
                 if (msg.action === "CREATE") {
                     const mail: XTypes.WS.IMail = msg.data;
+
+                    console.log(mail);
+
                     try {
                         await this.db.saveMail(
                             mail,

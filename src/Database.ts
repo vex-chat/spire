@@ -343,7 +343,7 @@ export class Database {
             extra: XUtils.encodeHex(mail.extra),
             header: XUtils.encodeHex(header),
             time: new Date(Date.now()),
-            group: mail.group ? XUtils.encodeHex(mail.group) : undefined,
+            group: mail.group ? XUtils.encodeHex(mail.group) : null,
         };
 
         await this.db("mail").insert(entry);
@@ -368,7 +368,7 @@ export class Database {
                 nonce: XUtils.decodeHex(row.nonce),
                 extra: XUtils.decodeHex(row.extra),
                 sender: row.sender,
-                group: row.group ? XUtils.decodeHex(row.group) : undefined,
+                group: row.group ? XUtils.decodeHex(row.group) : null,
                 mailID: row.mailID,
             };
             const msgh = XUtils.decodeHex(row.header);
