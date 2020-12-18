@@ -241,10 +241,10 @@
   dependencies:
     tweetnacl "^1.0.3"
 
-"@vex-chat/types-js@^0.7.12":
-  version "0.7.12"
-  resolved "https://npm.pkg.github.com/download/@vex-chat/types-js/0.7.12/5aa46f771ec524643fe4e7f20db4e9d6e07132876b7e74b4cd765ef0138427b4#f4ec64d36a582efda63e8c695e7734cf2ece8578"
-  integrity sha512-XXOrJHQ627GlEFbBdmhWQUqBaWDujAQTfiv4hFUR6Xoikb6wkLQ1df7YpVp8rmd0HhEveU30eVm47OYcgI50YA==
+"@vex-chat/types-js@^0.7.14":
+  version "0.7.14"
+  resolved "https://npm.pkg.github.com/download/@vex-chat/types-js/0.7.14/855d97cb620b6a2f9fea008f3da7ce23b62312aed232cd92f695a09fee9a25dd#8f836b511d93428a69d567f4c6290a5218a4a168"
+  integrity sha512-dy9HUkBnOHNWjeVuuffW7iDXruYRX/BOIw5Zt1s/3x00or8YvbPMfB4mnvxiMS38Z0GSKcKYeh3fCsFfabRIvg==
   dependencies:
     tweetnacl "^1.0.3"
 

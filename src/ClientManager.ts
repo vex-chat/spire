@@ -187,11 +187,12 @@ export class ClientManager extends EventEmitter {
         this.send(challenge);
     }
 
-    private sendErr(transmissionID: string, message: string) {
+    private sendErr(transmissionID: string, message: string, data?: any) {
         const error: XTypes.WS.IErrMsg = {
             transmissionID,
             type: "error",
             error: message,
+            data,
         };
         this.send(error);
     }
@@ -510,7 +511,7 @@ export class ClientManager extends EventEmitter {
             if (size > MAX_MSG_SIZE) {
                 this.sendErr(
                     msg.transmissionID,
-                    "Message is too big, max size " + MAX_MSG_SIZE
+                    "Message is too big. Received size "+ size + " while max size is " + MAX_MSG_SIZE
                 );
                 return;
             }
