@@ -28,6 +28,8 @@ function emptyHeader() {
     return new Uint8Array(32);
 }
 
+const MAX_MSG_SIZE = 2048;
+
 function unpackMessage(msg: Buffer): [Uint8Array, XTypes.WS.IBaseMsg] {
     const msgp = Uint8Array.from(msg);
 
@@ -94,8 +96,19 @@ export class ClientManager extends EventEmitter {
             log.debug(chalk.red.bold("OUTH"), emptyHeader.toString());
         }
 
+        const packedMessage = packMessage(msg, header);
+
+        log.info(
+            chalk.bold("⟶   ") +
+                responseColor(msg.type.toUpperCase()) +
+                " " +
+                this.toString() +
+                " " +
+                chalk.yellow(Buffer.byteLength(packedMessage))
+        );
+
         log.debug(chalk.red.bold("OUT"), msg);
-        this.conn.send(packMessage(msg, header));
+        this.conn.send(packedMessage);
     }
 
     private authorize(transmissionID: string) {
@@ -492,7 +505,32 @@ export class ClientManager extends EventEmitter {
         });
         this.conn.on("message", (message: Buffer) => {
             const [header, msg] = unpackMessage(message);
+            const size = Buffer.byteLength(message);
 
+            if (size > MAX_MSG_SIZE) {
+                this.sendErr(
+                    msg.transmissionID,
+                    "Message is too big, max size " + MAX_MSG_SIZE
+                );
+                return;
+            }
+
+            log.info(
+                chalk.bold("⟵   ") +
+                    (msg.type === "resource"
+                        ? crudColor(
+                              (msg as XTypes.WS.IResourceMsg).action.toUpperCase()
+                          ) +
+                          " " +
+                          chalk.bold(
+                              (msg as XTypes.WS.IResourceMsg).resourceType.toUpperCase()
+                          )
+                        : chalk.bold(msg.type.toUpperCase())) +
+                    " " +
+                    this.toString() +
+                    " " +
+                    chalk.yellow(size)
+            );
             log.debug(chalk.red.bold("INH"), header.toString());
             log.debug(chalk.red.bold("IN"), msg);
 
@@ -542,3 +580,29 @@ export class ClientManager extends EventEmitter {
         });
     }
 }
+
+const crudColor = (action: string): string => {
+    switch (action) {
+        case "CREATE":
+            return chalk.yellow.bold(action);
+        case "RETRIEVE":
+            return chalk.yellow.bold(action);
+        case "UPDATE":
+            return chalk.cyan.bold(action);
+        case "DELETE":
+            return chalk.red.bold(action);
+        default:
+            return action;
+    }
+};
+
+const responseColor = (status: string): string => {
+    switch (status) {
+        case "SUCCESS":
+            return chalk.green.bold(status);
+        case "ERROR":
+            return chalk.red.bold(status);
+        default:
+            return status;
+    }
+};

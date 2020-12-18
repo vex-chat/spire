@@ -412,7 +412,7 @@ export class Database {
                 table.string("mailID");
                 table.string("sender");
                 table.string("header");
-                table.string("cipher");
+                table.text("cipher", "mediumtext");
                 table.string("group");
                 table.text("extra");
                 table.integer("mailType");
