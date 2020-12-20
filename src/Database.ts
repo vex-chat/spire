@@ -123,6 +123,12 @@ export class Database {
     ): Promise<XTypes.SQL.IPermission> {
         const permissionID = uuid.v4();
 
+        // check if it already exists
+        const checkPermission = await this.db.from("permissions").select().where({ userID, resourceID });
+        if (checkPermission.length > 0) {
+            return checkPermission[0];
+        }
+
         const permission: XTypes.SQL.IPermission = {
             permissionID,
             userID,
