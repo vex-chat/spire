@@ -115,6 +115,26 @@ export class XChat {
         this.api.use(morgan("dev", { stream: process.stdout }));
         this.api.use(cors());
 
+        this.api.get("/server/:id", async (req, res) => {
+            const server = await this.db.retrieveServer(req.params.id);
+
+            if (server) {
+                return res.send(server);
+            } else {
+                res.sendStatus(404);
+            }
+        })
+
+        this.api.get("/channel/:id", async (req, res) => {
+            const channel = await this.db.retrieveChannel(req.params.id);
+
+            if (channel) {
+                return res.send(channel);
+            } else {
+                res.sendStatus(404);
+            }
+        })
+
         this.api.get("/user/:id", async (req, res) => {
             const user = await this.db.retrieveUser(req.params.id);
 
