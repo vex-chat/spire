@@ -511,7 +511,10 @@ export class ClientManager extends EventEmitter {
             if (size > MAX_MSG_SIZE) {
                 this.sendErr(
                     msg.transmissionID,
-                    "Message is too big. Received size "+ size + " while max size is " + MAX_MSG_SIZE
+                    "Message is too big. Received size " +
+                        size +
+                        " while max size is " +
+                        MAX_MSG_SIZE
                 );
                 return;
             }

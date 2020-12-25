@@ -124,7 +124,10 @@ export class Database {
         const permissionID = uuid.v4();
 
         // check if it already exists
-        const checkPermission = await this.db.from("permissions").select().where({ userID, resourceID });
+        const checkPermission = await this.db
+            .from("permissions")
+            .select()
+            .where({ userID, resourceID });
         if (checkPermission.length > 0) {
             return checkPermission[0];
         }
@@ -279,6 +282,7 @@ export class Database {
                 signKey: regPayload.signKey,
                 username: regPayload.username,
                 lastSeen: new Date(Date.now()),
+                avatar: null,
             };
             await this.db("users").insert(user);
 
@@ -408,6 +412,7 @@ export class Database {
                 table.string("userID").primary();
                 table.string("signKey").unique();
                 table.string("username").unique();
+                table.string("avatar");
                 table.dateTime("lastSeen");
             });
         }

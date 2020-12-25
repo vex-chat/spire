@@ -123,7 +123,7 @@ export class XChat {
             } else {
                 res.sendStatus(404);
             }
-        })
+        });
 
         this.api.get("/channel/:id", async (req, res) => {
             const channel = await this.db.retrieveChannel(req.params.id);
@@ -133,7 +133,7 @@ export class XChat {
             } else {
                 res.sendStatus(404);
             }
-        })
+        });
 
         this.api.get("/user/:id", async (req, res) => {
             const user = await this.db.retrieveUser(req.params.id);
