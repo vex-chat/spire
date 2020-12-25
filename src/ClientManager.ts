@@ -492,6 +492,13 @@ export class ClientManager extends EventEmitter {
         await this.db.deleteMail(msg.nonce, this.getUser().userID);
     }
 
+    private async updateAvatar(avatar: string) {
+        const userCopy = { ...this.getUser() };
+        userCopy.avatar = avatar;
+
+        await this.db.updateUser(userCopy);
+    }
+
     private initListeners() {
         this.conn.on("open", () => {
             setTimeout(() => {

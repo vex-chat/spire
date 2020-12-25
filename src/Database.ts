@@ -402,7 +402,7 @@ export class Database {
             .where({ userID: user.userID })
             .update({
                 lastSeen: new Date(Date.now()),
-                username: user.username,
+                avatar: user.avatar,
             });
     }
 
