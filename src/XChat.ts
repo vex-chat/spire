@@ -3,6 +3,7 @@ import { XTypes } from "@vex-chat/types-js";
 import cors from "cors";
 import log from "electron-log";
 import express from "express";
+import fs from "fs";
 import helmet from "helmet";
 import morgan from "morgan";
 import nacl from "tweetnacl";
@@ -14,7 +15,12 @@ import { Database } from "./Database";
 // expiry of regkeys
 export const EXPIRY_TIME = 10000;
 
+// 3-19 chars long
 const usernameRegex = /^(\w{3,19})$/;
+
+if (!fs.existsSync("files")) {
+    fs.mkdirSync("files");
+}
 
 export class XChat {
     private db = new Database();
@@ -145,6 +151,62 @@ export class XChat {
             }
         });
 
+        this.api.get("/file/:id", async (req, res) => {
+            const entry = await this.db.retrieveFile(req.params.id);
+            if (!entry) {
+                res.sendStatus(404);
+            } else {
+                fs.readFile("files/" + entry.fileID, undefined, (err, file) => {
+                    if (err) {
+                        log.error("error reading file");
+                        res.sendStatus(500);
+                    } else {
+                        const resp: XTypes.HTTP.IFileResponse = {
+                            details: entry,
+                            data: file,
+                        };
+                        res.send(resp);
+                    }
+                });
+            }
+        });
+
+        this.api.post("/file", async (req, res) => {
+            const payload: XTypes.HTTP.IFilePayload = req.body;
+
+            const userEntry = await this.db.retrieveUser(payload.owner);
+            if (!userEntry) {
+                console.warn("User does not exist.");
+                res.sendStatus(500);
+                return;
+            }
+
+            const data = nacl.sign.open(
+                XUtils.decodeHex(payload.signed),
+                XUtils.decodeHex(userEntry.signKey)
+            );
+            if (!data) {
+                console.warn("Bad signature on file.");
+                res.sendStatus(500);
+                return;
+            }
+
+            const newFile: XTypes.SQL.IFile = {
+                fileID: uuid.v4(),
+                owner: payload.owner,
+                nonce: payload.nonce,
+            };
+
+            // write the file to disk
+            fs.writeFile("files/" + newFile.fileID, data, () => {
+                console.log("Wrote new file " + newFile.fileID);
+            });
+
+            await this.db.createFile(newFile);
+
+            res.send(newFile);
+        });
+
         this.api.post("/register/key", (req, res) => {
             try {
                 log.info("New regkey requested.");
@@ -220,6 +282,7 @@ export class XChat {
                                     "Unsupported sql error type:",
                                     (err as any).code
                                 );
+                                log.error(err);
                                 res.sendStatus(500);
                                 break;
                         }

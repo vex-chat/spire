@@ -301,6 +301,23 @@ export class Database {
         }
     }
 
+    public async createFile(file: XTypes.SQL.IFile): Promise<void> {
+        return this.db("files").insert(file);
+    }
+
+    public async retrieveFile(
+        fileID: string
+    ): Promise<XTypes.SQL.IFile | null> {
+        const file = await this.db
+            .from("files")
+            .select()
+            .where({ fileID });
+        if (file.length === 0) {
+            return null;
+        }
+        return file[0];
+    }
+
     // the identifier can be username, public key, or userID
     public async retrieveUser(
         userIdentifier: string
@@ -469,6 +486,14 @@ export class Database {
                 table.string("resourceType");
                 table.string("resourceID").index();
                 table.integer("powerLevel");
+            });
+        }
+
+        if (!(await this.db.schema.hasTable("files"))) {
+            await this.db.schema.createTable("files", (table) => {
+                table.string("fileID").primary();
+                table.string("owner").index();
+                table.string("nonce");
             });
         }
     }

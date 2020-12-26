@@ -8,6 +8,7 @@
     "private": true,
     "scripts": {
         "start": "node ./dist/index.js",
+        "restart": "pm2 restart 0",
         "build": "node ./node_modules/typescript/bin/tsc",
         "prettier": "node ./node_modules/prettier/bin-prettier.js '**/*.{ts,tsx,json,md}' --tab-width 4 --trailing-comma es5 --ignore-path .gitignore  --arrow-parens always --write",
         "lint": "./node_modules/tslint/bin/tslint src/**/*.ts{,x}",
@@ -42,7 +43,7 @@
         "@types/uuid": "^8.3.0",
         "@types/ws": "^7.4.0",
         "@vex-chat/crypto-js": "^0.7.3",
-        "@vex-chat/types-js": "^0.7.15",
+        "@vex-chat/types-js": "^0.7.17",
         "chalk": "^4.1.0",
         "cors": "^2.8.5",
         "dotenv": "^8.2.0",
