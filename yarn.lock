@@ -217,16 +217,16 @@
   dependencies:
     "@types/node" "*"
 
-"@vex-chat/crypto-js@^0.7.3":
-  version "0.7.3"
-  resolved "https://npm.pkg.github.com/download/@vex-chat/crypto-js/0.7.3/0e1806548389cb1638f3c6727c072453ce09f0a27b9537fee1ee1fddbf3c439a#2d9c9f568f61580ff401bae075b93e8ebad320a3"
-  integrity sha512-vcZsn7PVSO2yjuPdwM0wR/9Qx6b7wqmu/2jP/9WNjqeejIsxKk7r3ao4gjkphvAe/idzrX4m+a2TpAlWhGbepA==
+"@vex-chat/crypto@^0.7.11":
+  version "0.7.11"
+  resolved "https://registry.yarnpkg.com/@vex-chat/crypto/-/crypto-0.7.11.tgz#14344f60b6de7b5954ac07afa1dace56d0ea29c9"
+  integrity sha512-8nyGRgMOA3w/ocPCcyjE/0yV0/wwTZkUdOvssjYl6gEAdCZtaiLv0/kpT0sHnYKJmev263qdSst2jqZCKr4CXg==
   dependencies:
     "@extrahash/keyring" "^1.0.1"
     "@types/create-hmac" "^1.1.0"
     "@types/ed2curve" "^0.2.2"
     "@types/msgpack-lite" "^0.1.7"
-    "@vex-chat/types-js" "^0.7.0"
+    "@vex-chat/types" "^0.7.21"
     bip39 "^3.0.3"
     create-hmac "^1.1.7"
     ed2curve "^0.3.0"
@@ -234,17 +234,10 @@
     msgpack-lite "^0.1.26"
     tweetnacl "^1.0.3"
 
-"@vex-chat/types-js@^0.7.0":
-  version "0.7.2"
-  resolved "https://npm.pkg.github.com/download/@vex-chat/types-js/0.7.2/8762c145fb16b6e27c68744d6a2ff3ee69a139fe01b757a2c09cf66685daa3d7#bdb3587b35279789051baf54e4a96c72e1144442"
-  integrity sha512-p+WHBnkUtDEysKGweq/4OxatVMC7dA9rVjX2f43kpwNuQKwk00dBXMwp20i6oo6h5zkBpd4DAdRQiryenmmD/A==
-  dependencies:
-    tweetnacl "^1.0.3"
-
-"@vex-chat/types-js@^0.7.17":
-  version "0.7.17"
-  resolved "https://npm.pkg.github.com/download/@vex-chat/types-js/0.7.17/a7a27f91fd1f47d1df7641af7353c73aad5e360ac670b259be5c11265a5d6622#59385c079a164fba8530b98639f32b3080feb869"
-  integrity sha512-igFdG+6djzsH6BzqU93NNA0uBvwih5McDmcF2yz4nuRivXrbURfQXIjgmYFJmKnfU3DoMmsHwLPx7rdT4NdTOg==
+"@vex-chat/types@^0.7.21":
+  version "0.7.21"
+  resolved "https://registry.yarnpkg.com/@vex-chat/types/-/types-0.7.21.tgz#64631ba2ac7edd5dc0ce9d32d15f76f164715a43"
+  integrity sha512-5JceTul3ei+j9t+QcLe1arKyuMDfMNwpJz1LaZ6ncWvKi6DeBrI3lHrzVZSN6uCXCrI1apB7rqCl8WxyXCkHNA==
   dependencies:
     tweetnacl "^1.0.3"
 

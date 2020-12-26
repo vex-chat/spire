@@ -1,5 +1,5 @@
-import { XUtils } from "@vex-chat/crypto-js";
-import { XTypes } from "@vex-chat/types-js";
+import { XUtils } from "@vex-chat/crypto";
+import { XTypes } from "@vex-chat/types";
 import cors from "cors";
 import log from "electron-log";
 import express from "express";
