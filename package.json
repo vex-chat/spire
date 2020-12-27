@@ -1,5 +1,5 @@
 {
-    "name": "@vex-chat/vex-server-js",
+    "name": "@vex-chat/spire",
     "version": "0.2.0",
     "description": "Vex server implementation in NodeJS.",
     "main": "./dist/index.js",
