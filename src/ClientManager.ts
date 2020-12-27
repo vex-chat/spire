@@ -1,6 +1,6 @@
 import { sleep } from "@extrahash/sleep";
-import { xConcat, XUtils } from "@vex-chat/crypto-js";
-import { XTypes } from "@vex-chat/types-js";
+import { xConcat, XUtils } from "@vex-chat/crypto";
+import { XTypes } from "@vex-chat/types";
 import chalk from "chalk";
 import log from "electron-log";
 import { EventEmitter } from "events";
