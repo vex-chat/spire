@@ -500,6 +500,7 @@ export class ClientManager extends EventEmitter {
                         this.getUser().userID,
                         "server"
                     );
+                    let found = false;
                     for (const permission of permissions) {
                         if (
                             permission.resourceID === serverID &&
@@ -510,14 +511,18 @@ export class ClientManager extends EventEmitter {
                                 serverID
                             );
                             this.sendSuccess(msg.transmissionID, channel);
+                            found = true;
+                            break;
                         }
                     }
-                    this.sendErr(
-                        msg.transmissionID,
-                        "You don't have permission to do that."
-                    );
-
-                    this.notifyServerChange(serverID, msg.transmissionID);
+                    if (!found) {
+                        this.sendErr(
+                            msg.transmissionID,
+                            "You don't have permission to do that."
+                        );
+                    } else {
+                        this.notifyServerChange(serverID, msg.transmissionID);
+                    }
                     break;
                 }
                 if (msg.action === "DELETE") {
