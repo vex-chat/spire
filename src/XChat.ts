@@ -203,7 +203,6 @@ export class XChat {
             });
 
             await this.db.createFile(newFile);
-
             res.send(newFile);
         });
 

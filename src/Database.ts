@@ -222,6 +222,37 @@ export class Database {
         return server;
     }
 
+    /**
+     * Retrives a list of users that should be notified when a specific resourceID
+     * experiences changes.
+     *
+     * @param resourceID
+     */
+    public async retrieveAffectedUsers(
+        resourceID: string
+    ): Promise<XTypes.SQL.IUser[]> {
+        const permissionList = await this.retrievePermissionsByResourceID(
+            resourceID
+        );
+
+        const users: XTypes.SQL.IUser[] = [];
+        for (const permission of permissionList) {
+            const user = await this.retrieveUser(permission.userID);
+            if (user) {
+                users.push(user);
+            }
+        }
+
+        return users;
+    }
+
+    public async retrievePermissionsByResourceID(resourceID: string) {
+        return this.db
+            .from("permissions")
+            .select()
+            .where({ resourceID });
+    }
+
     public async retrievePermissions(
         userID: string,
         resourceType: string
@@ -253,6 +284,37 @@ export class Database {
         }
         const server: XTypes.SQL.IServer = rows[0];
         return server;
+    }
+
+    public async deletePermissions(resourceID: string): Promise<void> {
+        await this.db
+            .from("permissions")
+            .where({ resourceID })
+            .delete();
+    }
+
+    public async deleteChannel(channelID: string): Promise<void> {
+        await this.deletePermissions(channelID);
+        await this.db
+            .from("mail")
+            .where({ group: channelID })
+            .delete();
+        await this.db
+            .from("channels")
+            .where({ channelID })
+            .delete();
+    }
+
+    public async deleteServer(serverID: string): Promise<void> {
+        await this.deletePermissions(serverID);
+        const channels = await this.retrieveChannels(serverID);
+        for (const channel of channels) {
+            await this.deleteChannel(channel.channelID);
+        }
+        await this.db
+            .from("servers")
+            .where({ serverID })
+            .delete();
     }
 
     public async retrieveServers(

@@ -117,6 +117,15 @@ export class ClientManager extends EventEmitter {
         this.emit("authed");
     }
 
+    // notifies all users when a given resourceID changes
+    private async notifyServerChange(serverID: string, transmissionID: string) {
+        const affectedUsers = await this.db.retrieveAffectedUsers(serverID);
+        // tell everyone about server change
+        for (const user of affectedUsers) {
+            this.notify(user.userID, "serverChange", transmissionID, serverID);
+        }
+    }
+
     private fail() {
         if (this.failed) {
             return;
@@ -262,6 +271,7 @@ export class ClientManager extends EventEmitter {
                                         newPerm
                                     );
                                     found = true;
+
                                     break;
                                 }
                             }
@@ -441,6 +451,31 @@ export class ClientManager extends EventEmitter {
                     );
                     this.sendSuccess(msg.transmissionID, server);
                 }
+                if (msg.action === "DELETE") {
+                    const permissions = await this.db.retrievePermissions(
+                        this.getUser().userID,
+                        "server"
+                    );
+                    let found = false;
+                    for (const permission of permissions) {
+                        if (
+                            permission.resourceID === msg.data &&
+                            permission.powerLevel > 50
+                        ) {
+                            // msg.data is the serverID
+                            await this.db.deleteServer(msg.data as string);
+                            this.sendSuccess(msg.transmissionID, null);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        this.sendErr(
+                            msg.transmissionID,
+                            "You don't have permission to do that."
+                        );
+                    }
+                }
                 break;
             case "channels":
                 if (msg.action === "RETRIEVE") {
@@ -481,6 +516,45 @@ export class ClientManager extends EventEmitter {
                         msg.transmissionID,
                         "You don't have permission to do that."
                     );
+
+                    this.notifyServerChange(serverID, msg.transmissionID);
+                    break;
+                }
+                if (msg.action === "DELETE") {
+                    const channel = await this.db.retrieveChannel(
+                        msg.data || ""
+                    );
+                    if (!channel) {
+                        this.sendErr(
+                            msg.transmissionID,
+                            "You don't have permission to do that."
+                        );
+                        break;
+                    }
+
+                    const permissions = await this.db.retrievePermissions(
+                        this.getUser().userID,
+                        "server"
+                    );
+                    for (const permission of permissions) {
+                        if (
+                            permission.resourceID === channel.serverID &&
+                            permission.powerLevel > 50
+                        ) {
+                            // msg.data is the channelID
+                            await this.db.deleteChannel(msg.data as string);
+                            this.sendSuccess(msg.transmissionID, null);
+                            this.notifyServerChange(
+                                channel.serverID,
+                                msg.transmissionID
+                            );
+                            break;
+                        }
+                    }
+                    this.sendErr(
+                        msg.transmissionID,
+                        "You don't have permission to do that."
+                    );
                 }
                 break;
             default:
@@ -490,13 +564,6 @@ export class ClientManager extends EventEmitter {
 
     private async handleReceipt(msg: XTypes.WS.IReceiptMsg) {
         await this.db.deleteMail(msg.nonce, this.getUser().userID);
-    }
-
-    private async updateAvatar(avatar: string) {
-        const userCopy = { ...this.getUser() };
-        userCopy.avatar = avatar;
-
-        await this.db.updateUser(userCopy);
     }
 
     private initListeners() {
