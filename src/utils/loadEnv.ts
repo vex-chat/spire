@@ -14,6 +14,7 @@ export function loadEnv(): void {
         "SQL_PORT",
         "API_PORT",
         "SOCKET_PORT",
+        "CANARY",
     ];
     for (const required of requiredEnvVars) {
         if (process.env[required] === undefined) {

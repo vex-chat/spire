@@ -172,7 +172,7 @@ export class XChat {
         });
 
         this.api.get("/canary", async (req, res) => {
-            res.send({ canary: true });
+            res.send({ canary: process.env.CANARY });
         });
 
         this.api.post("/file", async (req, res) => {
