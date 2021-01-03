@@ -1,10 +1,3 @@
-import { loadEnv } from "./utils/loadEnv";
-import { XChat } from "./XChat";
+import { Spire } from "./Spire";
 
-async function main() {
-    // load the environment variables
-    loadEnv();
-    const xchat = new XChat();
-}
-
-main();
+export { Spire };

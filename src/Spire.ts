@@ -22,7 +22,7 @@ if (!fs.existsSync("files")) {
     fs.mkdirSync("files");
 }
 
-export class XChat {
+export class Spire {
     private db = new Database();
     private wss = new WebSocket.Server({
         port: Number(process.env.SOCKET_PORT!),

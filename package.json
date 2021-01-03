@@ -1,13 +1,12 @@
 {
     "name": "@vex-chat/spire",
-    "version": "0.2.0",
+    "version": "0.2.2",
     "description": "Vex server implementation in NodeJS.",
     "main": "./dist/index.js",
     "author": "Extra <extrahash@protonmail.com>",
     "license": "AGPL-3.0-or-later",
-    "private": true,
     "scripts": {
-        "start": "node ./dist/index.js",
+        "start": "node ./dist/run.js",
         "restart": "pm2 restart 0",
         "build": "node ./node_modules/typescript/bin/tsc",
         "prettier": "node ./node_modules/prettier/bin-prettier.js '**/*.{ts,tsx,json,md}' --tab-width 4 --trailing-comma es5 --ignore-path .gitignore  --arrow-parens always --write",

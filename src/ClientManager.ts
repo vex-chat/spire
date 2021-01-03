@@ -13,8 +13,8 @@ import {
 } from "uuid";
 import WebSocket from "ws";
 import { Database } from "./Database";
+import { EXPIRY_TIME } from "./Spire";
 import { createUint8UUID } from "./utils/createUint8UUID";
-import { EXPIRY_TIME } from "./XChat";
 
 log.transports.console.level = "info";
 console.log = log.log;
