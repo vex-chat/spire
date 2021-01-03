@@ -3,10 +3,10 @@ import { XTypes } from "@vex-chat/types";
 import cors from "cors";
 import { EventEmitter } from "events";
 import express from "express";
+import expressWs from "express-ws";
 import fs from "fs";
 import helmet from "helmet";
 import { Server } from "http";
-import https from "https";
 import morgan from "morgan";
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
@@ -42,10 +42,12 @@ export interface ISpireOptions {
 
 export class Spire extends EventEmitter {
     private db: Database;
-    private wss: WebSocket.Server;
     private clients: ClientManager[] = [];
 
-    private api = express();
+    private expWs: expressWs.Instance = expressWs(express());
+    private api = this.expWs.app;
+    private wss: WebSocket.Server = this.expWs.getWss();
+
     private regKeys: XTypes.HTTP.IRegKey[] = [];
     private log: winston.Logger;
     private server: Server | null = null;
@@ -125,7 +127,13 @@ export class Spire extends EventEmitter {
     }
 
     private init(apiPort: number) {
-        this.wss.on("connection", (ws) => {
+        this.api.use(express.json());
+        this.api.use(helmet());
+
+        this.api.use(morgan("dev", { stream: process.stdout }));
+        this.api.use(cors());
+
+        this.api.ws("/socket", (ws, req) => {
             this.log.info("New client initiated.");
             const client = new ClientManager(
                 ws,
@@ -135,8 +143,7 @@ export class Spire extends EventEmitter {
 
             client.on("fail", () => {
                 this.log.info(
-                    "Client connection is down, removing: ",
-                    client.toString()
+                    "Client connection is down, removing: " + client.toString()
                 );
                 if (this.clients.includes(client)) {
                     this.clients.splice(this.clients.indexOf(client), 1);
@@ -147,19 +154,13 @@ export class Spire extends EventEmitter {
             });
 
             client.on("authed", () => {
-                this.log.info("New client authorized: ", client.toString());
+                this.log.info("New client authorized: " + client.toString());
                 this.clients.push(client);
                 this.log.info(
                     "Current authorized clients: " + this.clients.length
                 );
             });
         });
-
-        this.api.use(express.json());
-        this.api.use(helmet());
-
-        this.api.use(morgan("dev", { stream: process.stdout }));
-        this.api.use(cors());
 
         this.api.get("/server/:id", async (req, res) => {
             const server = await this.db.retrieveServer(req.params.id);
@@ -322,8 +323,8 @@ export class Spire extends EventEmitter {
                                 break;
                             default:
                                 this.log.info(
-                                    "Unsupported sql error type:",
-                                    (err as any).code
+                                    "Unsupported sql error type: " +
+                                        (err as any).code
                                 );
                                 this.log.error(err);
                                 res.sendStatus(500);

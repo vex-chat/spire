@@ -2,8 +2,8 @@ import { sleep } from "@extrahash/sleep";
 import { xConcat, XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import chalk from "chalk";
-import log from "electron-log";
 import { EventEmitter } from "events";
+import { json } from "express";
 import msgpack from "msgpack-lite";
 import nacl from "tweetnacl";
 import {
@@ -11,14 +11,12 @@ import {
     v4 as uuidv4,
     validate as uuidValidate,
 } from "uuid";
+import winston, { Logform } from "winston";
 import WebSocket from "ws";
 import { Database } from "./Database";
 import { EXPIRY_TIME } from "./Spire";
+import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
-
-log.transports.console.level = "info";
-console.log = log.log;
-console.error = log.error;
 
 const POWER_LEVELS = {
     CREATE: 50,
@@ -53,6 +51,7 @@ export class ClientManager extends EventEmitter {
     private failed: boolean = false;
     private db: Database;
     private user: XTypes.SQL.IUser | null;
+    private log: winston.Logger;
     private notify: (
         userID: string,
         event: string,
@@ -70,6 +69,7 @@ export class ClientManager extends EventEmitter {
         this.db = db;
         this.user = null;
         this.notify = notify;
+        this.log = createLogger("client-manager", "info");
 
         this.initListeners();
         this.challenge();
@@ -91,14 +91,14 @@ export class ClientManager extends EventEmitter {
 
     public async send(msg: any, header?: Uint8Array) {
         if (header) {
-            log.debug(chalk.red.bold("OUTH"), header.toString());
+            this.log.debug(chalk.red.bold("OUTH"), header.toString());
         } else {
-            log.debug(chalk.red.bold("OUTH"), emptyHeader.toString());
+            this.log.debug(chalk.red.bold("OUTH"), emptyHeader.toString());
         }
 
         const packedMessage = packMessage(msg, header);
 
-        log.info(
+        this.log.info(
             chalk.bold("⟶   ") +
                 responseColor(msg.type.toUpperCase()) +
                 " " +
@@ -107,7 +107,7 @@ export class ClientManager extends EventEmitter {
                 chalk.yellow(Buffer.byteLength(packedMessage))
         );
 
-        log.debug(chalk.red.bold("OUT"), msg);
+        this.log.debug(chalk.red.bold("OUT"), msg);
         this.conn.send(packedMessage);
     }
 
@@ -130,7 +130,7 @@ export class ClientManager extends EventEmitter {
         if (this.failed) {
             return;
         }
-        log.warn("Connection failed.");
+        this.log.warn("Connection failed.");
         if (this.conn) {
             this.conn.close();
         }
@@ -177,11 +177,11 @@ export class ClientManager extends EventEmitter {
                     this.authorize(msg.transmissionID);
                 }
             } else {
-                log.info("Signature verification failed!");
+                this.log.info("Signature verification failed!");
                 this.fail();
             }
         } else {
-            log.info("User is not registered.");
+            this.log.info("User is not registered.");
             this.fail();
         }
     }
@@ -296,7 +296,7 @@ export class ClientManager extends EventEmitter {
                         );
                         this.sendSuccess(msg.transmissionID, keyCount);
                     } catch (err) {
-                        log.error(err);
+                        this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
                 }
@@ -308,7 +308,7 @@ export class ClientManager extends EventEmitter {
                         );
                         this.sendSuccess(msg.transmissionID, msg);
                     } catch (err) {
-                        log.error(err);
+                        this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
                 }
@@ -320,14 +320,14 @@ export class ClientManager extends EventEmitter {
                         if (user) {
                             this.sendSuccess(msg.transmissionID, user);
                         } else {
-                            log.error("User doesn't exist.");
+                            this.log.error("User doesn't exist.");
                             this.sendErr(
                                 msg.transmissionID,
                                 "That user doesn't exist."
                             );
                         }
                     } catch (err) {
-                        log.error(err);
+                        this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
                 }
@@ -339,7 +339,7 @@ export class ClientManager extends EventEmitter {
                         const users = await this.db.retrieveUsers();
                         this.sendSuccess(msg.transmissionID, users);
                     } catch (err) {
-                        log.error(err);
+                        this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
                 }
@@ -394,7 +394,7 @@ export class ClientManager extends EventEmitter {
                             );
                         }
                     } catch (err) {
-                        log.error(err);
+                        this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
                 }
@@ -415,7 +415,7 @@ export class ClientManager extends EventEmitter {
                         }
                         this.sendSuccess(msg.transmissionID, null);
                     } catch (err) {
-                        log.error(err);
+                        this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
                 }
@@ -428,11 +428,13 @@ export class ClientManager extends EventEmitter {
                             header,
                             this.getUser().userID
                         );
-                        log.info("Received mail for " + msg.data.recipient);
+                        this.log.info(
+                            "Received mail for " + msg.data.recipient
+                        );
                         this.sendSuccess(msg.transmissionID, null);
                         this.notify(mail.recipient, "mail", msg.transmissionID);
                     } catch (err) {
-                        log.error(err);
+                        this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
                 }
@@ -541,13 +543,16 @@ export class ClientManager extends EventEmitter {
                         this.getUser().userID,
                         "server"
                     );
+                    let found = false;
                     for (const permission of permissions) {
                         if (
                             permission.resourceID === channel.serverID &&
                             permission.powerLevel > 50
                         ) {
+                            found = true;
                             // msg.data is the channelID
                             await this.db.deleteChannel(msg.data as string);
+
                             this.sendSuccess(msg.transmissionID, null);
                             this.notifyServerChange(
                                 channel.serverID,
@@ -556,14 +561,16 @@ export class ClientManager extends EventEmitter {
                             break;
                         }
                     }
-                    this.sendErr(
-                        msg.transmissionID,
-                        "You don't have permission to do that."
-                    );
+                    if (!found) {
+                        this.sendErr(
+                            msg.transmissionID,
+                            "You don't have permission to do that."
+                        );
+                    }
                 }
                 break;
             default:
-                log.info("Unsupported resource type " + msg.resourceType);
+                this.log.info("Unsupported resource type " + msg.resourceType);
         }
     }
 
@@ -598,7 +605,7 @@ export class ClientManager extends EventEmitter {
                 return;
             }
 
-            log.info(
+            this.log.info(
                 chalk.bold("⟵   ") +
                     (msg.type === "resource"
                         ? crudColor(
@@ -614,8 +621,8 @@ export class ClientManager extends EventEmitter {
                     " " +
                     chalk.yellow(size)
             );
-            log.debug(chalk.red.bold("INH"), header.toString());
-            log.debug(chalk.red.bold("IN"), msg);
+            this.log.debug(chalk.red.bold("INH"), header.toString());
+            this.log.debug(chalk.red.bold("IN"), msg);
 
             if (!msg.type) {
                 this.sendErr(msg.transmissionID, "Message type is required.");
@@ -657,7 +664,7 @@ export class ClientManager extends EventEmitter {
                     this.setAlive(true);
                     break;
                 default:
-                    log.info("unsupported message %s", msg.type);
+                    this.log.info("unsupported message %s", msg.type);
                     break;
             }
         });
