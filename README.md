@@ -1,6 +1,6 @@
 # vex-server-js
 
-![typescript_ci](https://github.com/vex-chat/spire/workflows/typescript_ci/badge.svg)
+![build](https://github.com/vex-chat/spire/workflows/build/badge.svg)
 
 A vex server implementation in NodeJS.
 
