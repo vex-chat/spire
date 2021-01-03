@@ -1,5 +1,7 @@
 # vex-server-js
 
+![typescript_ci](https://github.com/vex-chat/spire/workflows/typescript_ci/badge.svg)
+
 A vex server implementation in NodeJS.
 
 ## Cryptography Notice
