@@ -1,6 +1,7 @@
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import cors from "cors";
+import { EventEmitter } from "events";
 import express from "express";
 import fs from "fs";
 import helmet from "helmet";
@@ -33,13 +34,13 @@ export interface ISpireOptions {
         | "verbose"
         | "debug"
         | "silly";
+    apiPort?: number;
+    socketPort?: number;
 }
 
-export class Spire {
+export class Spire extends EventEmitter {
     private db = new Database();
-    private wss = new WebSocket.Server({
-        port: Number(process.env.SOCKET_PORT!),
-    });
+    private wss: WebSocket.Server;
     private clients: ClientManager[] = [];
     private api = express();
     private regKeys: XTypes.HTTP.IRegKey[] = [];
@@ -47,8 +48,12 @@ export class Spire {
     private server: Server | null = null;
 
     constructor(options?: ISpireOptions) {
+        super();
+        this.wss = new WebSocket.Server({
+            port: Number(options?.socketPort || 16778),
+        });
         this.log = createLogger("spire", options?.logLevel || "error");
-        this.init();
+        this.init(options?.apiPort || 16777);
     }
 
     public close() {
@@ -110,7 +115,7 @@ export class Spire {
         this.log.info("Regkey not found.");
     }
 
-    private init() {
+    private init(apiPort: number) {
         this.wss.on("connection", (ws) => {
             this.log.info("New client initiated.");
             const client = new ClientManager(
@@ -330,10 +335,8 @@ export class Spire {
             }
         });
 
-        this.server = this.api.listen(Number(process.env.API_PORT!), () => {
-            this.log.info(
-                "API started on port " + process.env.API_PORT?.toString()
-            );
+        this.server = this.api.listen(apiPort, () => {
+            this.log.info("API started on port " + apiPort.toString());
         });
     }
 }

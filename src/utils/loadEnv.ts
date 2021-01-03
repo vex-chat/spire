@@ -12,8 +12,6 @@ export function loadEnv(): void {
         "SQL_PASSWORD",
         "SQL_DB_NAME",
         "SQL_PORT",
-        "API_PORT",
-        "SOCKET_PORT",
         "CANARY",
     ];
     for (const required of requiredEnvVars) {
