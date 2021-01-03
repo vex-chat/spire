@@ -4,7 +4,7 @@ import { loadEnv } from "./utils/loadEnv";
 async function main() {
     // load the environment variables
     loadEnv();
-    const server = new Spire();
+    const server = new Spire({ logLevel: "info" });
 }
 
 main();

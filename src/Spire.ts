@@ -1,16 +1,18 @@
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import cors from "cors";
-import log from "electron-log";
 import express from "express";
 import fs from "fs";
 import helmet from "helmet";
+import { Server } from "http";
 import morgan from "morgan";
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
+import winston from "winston";
 import WebSocket from "ws";
 import { ClientManager } from "./ClientManager";
 import { Database } from "./Database";
+import { createLogger } from "./utils/createLogger";
 
 // expiry of regkeys
 export const EXPIRY_TIME = 10000;
@@ -22,6 +24,17 @@ if (!fs.existsSync("files")) {
     fs.mkdirSync("files");
 }
 
+export interface ISpireOptions {
+    logLevel?:
+        | "error"
+        | "warn"
+        | "info"
+        | "http"
+        | "verbose"
+        | "debug"
+        | "silly";
+}
+
 export class Spire {
     private db = new Database();
     private wss = new WebSocket.Server({
@@ -30,9 +43,18 @@ export class Spire {
     private clients: ClientManager[] = [];
     private api = express();
     private regKeys: XTypes.HTTP.IRegKey[] = [];
+    private log: winston.Logger;
+    private server: Server | null = null;
 
-    constructor() {
+    constructor(options?: ISpireOptions) {
+        this.log = createLogger("spire", options?.logLevel || "error");
         this.init();
+    }
+
+    public close() {
+        if (this.server) {
+            this.server.close();
+        }
     }
 
     private notify(
@@ -70,27 +92,27 @@ export class Spire {
     }
 
     private validRegKey(key: string) {
-        log.info("Validating regkey: " + key);
+        this.log.info("Validating regkey: " + key);
         for (const rKey of this.regKeys) {
             if (rKey.key === key) {
                 const age =
                     new Date(Date.now()).getTime() - rKey.time.getTime();
-                log.info("Regkey found, " + age + " ms old.");
+                this.log.info("Regkey found, " + age + " ms old.");
                 if (age < EXPIRY_TIME) {
-                    log.info("Regkey is valid.");
+                    this.log.info("Regkey is valid.");
                     this.deleteRegKey(rKey);
                     return true;
                 } else {
-                    log.info("Regkey is expired.");
+                    this.log.info("Regkey is expired.");
                 }
             }
         }
-        log.info("Regkey not found.");
+        this.log.info("Regkey not found.");
     }
 
     private init() {
         this.wss.on("connection", (ws) => {
-            log.info("New client initiated.");
+            this.log.info("New client initiated.");
             const client = new ClientManager(
                 ws,
                 this.db,
@@ -98,20 +120,24 @@ export class Spire {
             );
 
             client.on("fail", () => {
-                log.info(
+                this.log.info(
                     "Client connection is down, removing: ",
                     client.toString()
                 );
                 if (this.clients.includes(client)) {
                     this.clients.splice(this.clients.indexOf(client), 1);
                 }
-                log.info("Current authorized clients: " + this.clients.length);
+                this.log.info(
+                    "Current authorized clients: " + this.clients.length
+                );
             });
 
             client.on("authed", () => {
-                log.info("New client authorized: ", client.toString());
+                this.log.info("New client authorized: ", client.toString());
                 this.clients.push(client);
-                log.info("Current authorized clients: " + this.clients.length);
+                this.log.info(
+                    "Current authorized clients: " + this.clients.length
+                );
             });
         });
 
@@ -158,7 +184,7 @@ export class Spire {
             } else {
                 fs.readFile("files/" + entry.fileID, undefined, (err, file) => {
                     if (err) {
-                        log.error("error reading file");
+                        this.log.error("error reading file");
                         res.sendStatus(500);
                     } else {
                         const resp: XTypes.HTTP.IFileResponse = {
@@ -212,9 +238,9 @@ export class Spire {
 
         this.api.post("/register/key", (req, res) => {
             try {
-                log.info("New regkey requested.");
+                this.log.info("New regkey requested.");
                 const regKey = this.createRegKey();
-                log.info("New regkey created: " + regKey.key);
+                this.log.info("New regkey created: " + regKey.key);
 
                 setTimeout(() => {
                     this.deleteRegKey(regKey);
@@ -222,7 +248,7 @@ export class Spire {
 
                 return res.status(201).send(regKey);
             } catch (err) {
-                log.error(err.toString());
+                this.log.error(err.toString());
                 return res.sendStatus(500);
             }
         });
@@ -259,7 +285,7 @@ export class Spire {
                                     .toString()
                                     .includes("users_signkey_unique");
 
-                                log.warn(
+                                this.log.warn(
                                     "User attempted to register duplicate account."
                                 );
                                 if (usernameConflict) {
@@ -281,16 +307,16 @@ export class Spire {
                                 });
                                 break;
                             default:
-                                log.info(
+                                this.log.info(
                                     "Unsupported sql error type:",
                                     (err as any).code
                                 );
-                                log.error(err);
+                                this.log.error(err);
                                 res.sendStatus(500);
                                 break;
                         }
                     } else {
-                        log.info("Registration success.");
+                        this.log.info("Registration success.");
                         res.send(user);
                     }
                 } else {
@@ -299,13 +325,15 @@ export class Spire {
                     });
                 }
             } catch (err) {
-                log.error("error registering user:", err.toString());
+                this.log.error("error registering user: " + err.toString());
                 res.sendStatus(500);
             }
         });
 
-        this.api.listen(Number(process.env.API_PORT!), () => {
-            log.info("API started on port", process.env.API_PORT);
+        this.server = this.api.listen(Number(process.env.API_PORT!), () => {
+            this.log.info(
+                "API started on port " + process.env.API_PORT?.toString()
+            );
         });
     }
 }

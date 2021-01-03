@@ -1,6 +1,6 @@
 {
     "name": "@vex-chat/spire",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "description": "Vex server implementation in NodeJS.",
     "main": "./dist/index.js",
     "author": "Extra <extrahash@protonmail.com>",
@@ -34,7 +34,6 @@
     },
     "dependencies": {
         "@extrahash/sleep": "^1.0.0",
-        "@types/chalk": "^2.2.0",
         "@types/cors": "^2.8.8",
         "@types/express": "^4.17.9",
         "@types/morgan": "^1.9.2",
@@ -46,7 +45,6 @@
         "chalk": "^4.1.0",
         "cors": "^2.8.5",
         "dotenv": "^8.2.0",
-        "electron-log": "^4.1.1",
         "express": "^4.17.1",
         "helmet": "^4.2.0",
         "knex": "^0.21.12",
@@ -56,6 +54,7 @@
         "sqlite": "^4.0.17",
         "tweetnacl": "^1.0.3",
         "uuid": "^8.3.1",
+        "winston": "^3.3.3",
         "ws": "^7.4.0"
     }
 }
