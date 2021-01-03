@@ -67,6 +67,10 @@ export class Spire extends EventEmitter {
     }
 
     public async close(): Promise<void> {
+        this.wss.clients.forEach((ws) => {
+            ws.terminate();
+        });
+
         this.wss.on("close", () => {
             this.log.info("ws: closed.");
         });
@@ -78,6 +82,7 @@ export class Spire extends EventEmitter {
         this.server?.close();
         this.wss.close();
         await this.db.close();
+        return;
     }
 
     private notify(
