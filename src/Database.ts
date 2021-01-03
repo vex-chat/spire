@@ -21,6 +21,7 @@ export class Database {
                     },
                     useNullAsDefault: true,
                 });
+                break;
             case "sqlite3mem":
                 this.db = knex({
                     client: "sqlite3",
@@ -29,6 +30,7 @@ export class Database {
                     },
                     useNullAsDefault: true,
                 });
+                break;
             case "mysql":
             default:
                 this.db = knex({

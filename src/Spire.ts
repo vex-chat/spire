@@ -37,7 +37,6 @@ export interface ISpireOptions {
         | "silly";
     apiPort?: number;
     socketPort?: number;
-    selfSigned?: boolean;
     dbType?: "sqlite3" | "mysql" | "sqlite3mem";
 }
 
@@ -351,10 +350,8 @@ export class Spire extends EventEmitter {
             passphrase: "hunter2",
         };
 
-        this.server = this.options?.selfSigned
-            ? https.createServer(sslOptions, this.api).listen(apiPort)
-            : this.api.listen(apiPort);
-
-        this.log.info("API started on port " + apiPort.toString());
+        this.server = this.api.listen(apiPort, () => {
+            this.log.info("API started on port " + apiPort.toString());
+        });
     }
 }
