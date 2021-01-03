@@ -66,7 +66,7 @@ export class Spire extends EventEmitter {
         this.options = options;
     }
 
-    public close() {
+    public async close() {
         this.wss.on("close", () => {
             this.log.info("ws: closed.");
         });
@@ -76,8 +76,8 @@ export class Spire extends EventEmitter {
         });
 
         this.server?.close();
-        this.db.close();
         this.wss.close();
+        await this.db.close();
     }
 
     private notify(
