@@ -1,6 +1,6 @@
 # This workflow will do a clean install of dependencies, and compile the typescript.
 
-name: typescript_ci
+name: build
 
 on:
   push:
