@@ -244,7 +244,7 @@ export class Spire extends EventEmitter {
 
             // write the file to disk
             fs.writeFile("files/" + newFile.fileID, data, () => {
-                console.log("Wrote new file " + newFile.fileID);
+                this.log.info("Wrote new file " + newFile.fileID);
             });
 
             await this.db.createFile(newFile);
