@@ -51,16 +51,19 @@ export class Spire extends EventEmitter {
     private regKeys: XTypes.HTTP.IRegKey[] = [];
     private log: winston.Logger;
     private server: Server | null = null;
+    private options: ISpireOptions | undefined;
 
     constructor(options?: ISpireOptions) {
         super();
 
-        this.db = new Database(options?.dbType);
+        this.db = new Database(options);
         this.wss = new WebSocket.Server({
             port: Number(options?.socketPort || 16778),
         });
         this.log = createLogger("spire", options?.logLevel || "error");
         this.init(options?.apiPort || 16777);
+
+        this.options = options;
     }
 
     public close() {
@@ -142,7 +145,8 @@ export class Spire extends EventEmitter {
             const client = new ClientManager(
                 ws,
                 this.db,
-                this.notify.bind(this)
+                this.notify.bind(this),
+                this.options
             );
 
             client.on("fail", () => {

@@ -3,6 +3,7 @@ import { XTypes } from "@vex-chat/types";
 import knex from "knex";
 import * as uuid from "uuid";
 import winston from "winston";
+import { ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 
 const pubkeyRegex = /[0-9a-f]{64}/;
@@ -11,8 +12,8 @@ export class Database {
     private db: knex<any, unknown[]>;
     private log: winston.Logger = createLogger("spire-db", "info");
 
-    constructor(dbType?: string) {
-        switch (dbType) {
+    constructor(options?: ISpireOptions) {
+        switch (options?.dbType || "mysql") {
             case "sqlite3":
                 this.db = knex({
                     client: "sqlite3",

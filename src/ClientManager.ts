@@ -14,7 +14,7 @@ import {
 import winston, { Logform } from "winston";
 import WebSocket from "ws";
 import { Database } from "./Database";
-import { EXPIRY_TIME } from "./Spire";
+import { EXPIRY_TIME, ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
 
@@ -62,14 +62,15 @@ export class ClientManager extends EventEmitter {
     constructor(
         ws: WebSocket,
         db: Database,
-        notify: (userID: string, event: string, transmissionID: string) => void
+        notify: (userID: string, event: string, transmissionID: string) => void,
+        options?: ISpireOptions
     ) {
         super();
         this.conn = ws;
         this.db = db;
         this.user = null;
         this.notify = notify;
-        this.log = createLogger("client-manager", "info");
+        this.log = createLogger("client-manager", options?.logLevel || "error");
 
         this.initListeners();
         this.challenge();
