@@ -36,7 +36,6 @@ export interface ISpireOptions {
         | "debug"
         | "silly";
     apiPort?: number;
-    socketPort?: number;
     dbType?: "sqlite3" | "mysql" | "sqlite3mem";
 }
 
@@ -57,9 +56,6 @@ export class Spire extends EventEmitter {
         super();
 
         this.db = new Database(options);
-        this.wss = new WebSocket.Server({
-            port: Number(options?.socketPort || 16778),
-        });
         this.log = createLogger("spire", options?.logLevel || "error");
         this.init(options?.apiPort || 16777);
 
