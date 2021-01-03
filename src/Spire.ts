@@ -38,10 +38,11 @@ export interface ISpireOptions {
     apiPort?: number;
     socketPort?: number;
     selfSigned?: boolean;
+    dbType?: "sqlite3" | "mysql" | "sqlite3mem";
 }
 
 export class Spire extends EventEmitter {
-    private db = new Database();
+    private db: Database;
     private wss: WebSocket.Server;
     private clients: ClientManager[] = [];
 
@@ -55,6 +56,7 @@ export class Spire extends EventEmitter {
     constructor(options?: ISpireOptions) {
         super();
 
+        this.db = new Database(options?.dbType);
         this.options = options;
 
         this.wss = new WebSocket.Server({
