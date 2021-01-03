@@ -10,9 +10,10 @@ const pubkeyRegex = /[0-9a-f]{64}/;
 
 export class Database {
     private db: knex<any, unknown[]>;
-    private log: winston.Logger = createLogger("spire-db", "info");
+    private log: winston.Logger;
 
     constructor(options?: ISpireOptions) {
+        this.log = createLogger("spire-db", options?.logLevel || "error");
         switch (options?.dbType || "mysql") {
             case "sqlite3":
                 this.db = knex({

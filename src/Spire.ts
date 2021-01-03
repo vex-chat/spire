@@ -137,7 +137,10 @@ export class Spire extends EventEmitter {
         this.api.use(express.json());
         this.api.use(helmet());
 
-        this.api.use(morgan("dev", { stream: process.stdout }));
+        if (!jestRun()) {
+            this.api.use(morgan("dev", { stream: process.stdout }));
+        }
+
         this.api.use(cors());
 
         this.api.ws("/socket", (ws, req) => {
@@ -358,3 +361,10 @@ export class Spire extends EventEmitter {
         });
     }
 }
+
+/**
+ * @ignore
+ */
+const jestRun = () => {
+    return process.env.JEST_WORKER_ID !== undefined;
+};
