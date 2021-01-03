@@ -344,12 +344,6 @@ export class Spire extends EventEmitter {
             }
         });
 
-        const sslOptions = {
-            key: fs.readFileSync("./ssl/key.pem"),
-            cert: fs.readFileSync("./ssl/cert.pem"),
-            passphrase: "hunter2",
-        };
-
         this.server = this.api.listen(apiPort, () => {
             this.log.info("API started on port " + apiPort.toString());
         });
