@@ -66,7 +66,7 @@ export class Spire extends EventEmitter {
         this.options = options;
     }
 
-    public async close() {
+    public async close(): Promise<void> {
         this.wss.on("close", () => {
             this.log.info("ws: closed.");
         });
