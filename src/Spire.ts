@@ -52,14 +52,10 @@ export class Spire extends EventEmitter {
     private log: winston.Logger;
     private server: Server | null = null;
 
-    private options: ISpireOptions | undefined;
-
     constructor(options?: ISpireOptions) {
         super();
 
         this.db = new Database(options?.dbType);
-        this.options = options;
-
         this.wss = new WebSocket.Server({
             port: Number(options?.socketPort || 16778),
         });
@@ -68,9 +64,17 @@ export class Spire extends EventEmitter {
     }
 
     public close() {
-        if (this.server) {
-            this.server.close();
-        }
+        this.wss.on("close", () => {
+            this.log.info("ws: closed.");
+        });
+
+        this.server?.on("close", () => {
+            this.log.info("http: closed.");
+        });
+
+        this.server?.close();
+        this.db.close();
+        this.wss.close();
     }
 
     private notify(

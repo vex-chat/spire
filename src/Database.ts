@@ -512,6 +512,11 @@ export class Database {
             });
     }
 
+    public async close(): Promise<void> {
+        this.log.info("Closing database.");
+        await this.db.destroy();
+    }
+
     private async init(): Promise<void> {
         if (!(await this.db.schema.hasTable("users"))) {
             await this.db.schema.createTable("users", (table) => {
