@@ -90,7 +90,7 @@ export class Spire extends EventEmitter {
         event: string,
         transmissionID: string,
         data?: any
-    ) {
+    ): void {
         for (const client of this.clients) {
             if (client.getUser().userID === userID) {
                 const msg: XTypes.WS.INotifyMsg = {
@@ -119,7 +119,7 @@ export class Spire extends EventEmitter {
         }
     }
 
-    private validRegKey(key: string) {
+    private validRegKey(key: string): boolean {
         this.log.info("Validating regkey: " + key);
         for (const rKey of this.regKeys) {
             if (rKey.key === key) {
@@ -136,9 +136,10 @@ export class Spire extends EventEmitter {
             }
         }
         this.log.info("Regkey not found.");
+        return false;
     }
 
-    private init(apiPort: number) {
+    private init(apiPort: number): void {
         this.api.use(express.json());
         this.api.use(helmet());
 
