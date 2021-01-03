@@ -6,6 +6,7 @@ import express from "express";
 import fs from "fs";
 import helmet from "helmet";
 import { Server } from "http";
+import https from "https";
 import morgan from "morgan";
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
@@ -36,19 +37,26 @@ export interface ISpireOptions {
         | "silly";
     apiPort?: number;
     socketPort?: number;
+    selfSigned?: boolean;
 }
 
 export class Spire extends EventEmitter {
     private db = new Database();
     private wss: WebSocket.Server;
     private clients: ClientManager[] = [];
+
     private api = express();
     private regKeys: XTypes.HTTP.IRegKey[] = [];
     private log: winston.Logger;
     private server: Server | null = null;
 
+    private options: ISpireOptions | undefined;
+
     constructor(options?: ISpireOptions) {
         super();
+
+        this.options = options;
+
         this.wss = new WebSocket.Server({
             port: Number(options?.socketPort || 16778),
         });
@@ -335,8 +343,16 @@ export class Spire extends EventEmitter {
             }
         });
 
-        this.server = this.api.listen(apiPort, () => {
-            this.log.info("API started on port " + apiPort.toString());
-        });
+        const sslOptions = {
+            key: fs.readFileSync("./ssl/key.pem"),
+            cert: fs.readFileSync("./ssl/cert.pem"),
+            passphrase: "hunter2",
+        };
+
+        this.server = this.options?.selfSigned
+            ? https.createServer(sslOptions, this.api).listen(apiPort)
+            : this.api.listen(apiPort);
+
+        this.log.info("API started on port " + apiPort.toString());
     }
 }
