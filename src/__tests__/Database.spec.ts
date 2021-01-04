@@ -4,20 +4,30 @@ import { XTypes } from "@vex-chat/types";
 import uuid from "uuid";
 import winston from "winston";
 
-import { Database } from "./Database";
-import { db } from "./db-config";
+import { Database } from "../Database";
+import { db } from "../db-config";
 
-beforeEach(async () => {
+beforeAll(async () => {
     await db.migrate.latest();
 });
 
-afterEach(async () => {
-    await db.migrate.rollback();
+afterAll(async () => {
     await db.destroy();
 });
 
 describe("Database", () => {
+    const TABLES = ["oneTimeKeys", "preKeys"];
+
     const keyID = "1480f261c80b8dbce4f4";
+    const userID = "29c31922344590d153c6";
+
+    beforeEach(async () => {
+        await Promise.all(
+            TABLES.map(async (table) => {
+                await db(table).truncate();
+            })
+        );
+    });
 
     describe("saveOTK", () => {
         it("takes a userId and one time key, adds a keyId and saves it to oneTimeKey table", async () => {
@@ -31,7 +41,7 @@ describe("Database", () => {
 
             const expectedOTK: XTypes.SQL.IPreKeys = {
                 keyID,
-                userID: "29c31922344590d153c6",
+                userID,
                 publicKey: "3063653038663161393438383933616630353635",
                 signature: "3164383165323063626662626265336135323438",
                 index: 1,
@@ -57,6 +67,20 @@ describe("Database", () => {
                 .select()
                 .from<XTypes.WS.IPreKeys>("oneTimeKeys");
             expect(oneTimeKeys[0]).toEqual(expectedOTK);
+        });
+    });
+
+    describe("getPreKeys", () => {
+        it("return null if there are no preKeys with userId param", async () => {
+            // Arrange
+            expect.assertions(1); // in case there are async issues the test will fail in ci
+
+            // Act
+            const provider = new Database(db);
+            const result = await provider.getPreKeys(userID);
+
+            // Assert
+            expect(result).toBeNull();
         });
     });
 });
