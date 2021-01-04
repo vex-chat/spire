@@ -48,6 +48,8 @@ export class Spire extends EventEmitter {
     private wss: WebSocket.Server = this.expWs.getWss();
 
     private regKeys: XTypes.HTTP.IRegKey[] = [];
+    private fileKeys: XTypes.HTTP.IRegKey[] = [];
+
     private log: winston.Logger;
     private server: Server | null = null;
     private options: ISpireOptions | undefined;
@@ -115,6 +117,12 @@ export class Spire extends EventEmitter {
         }
     }
 
+    private deleteFileToken(key: XTypes.HTTP.IRegKey) {
+        if (this.fileKeys.includes(key)) {
+            this.fileKeys.splice(this.fileKeys.indexOf(key), 1);
+        }
+    }
+
     private validRegKey(key: string): boolean {
         this.log.info("Validating regkey: " + key);
         for (const rKey of this.regKeys) {
@@ -125,6 +133,26 @@ export class Spire extends EventEmitter {
                 if (age < EXPIRY_TIME) {
                     this.log.info("Regkey is valid.");
                     this.deleteRegKey(rKey);
+                    return true;
+                } else {
+                    this.log.info("Regkey is expired.");
+                }
+            }
+        }
+        this.log.info("Regkey not found.");
+        return false;
+    }
+
+    private validFileToken(key: string): boolean {
+        this.log.info("Validating regkey: " + key);
+        for (const fToken of this.fileKeys) {
+            if (fToken.key === key) {
+                const age =
+                    new Date(Date.now()).getTime() - fToken.time.getTime();
+                this.log.info("Regkey found, " + age + " ms old.");
+                if (age < 1000 * 60 * 5) {
+                    this.log.info("Regkey is valid.");
+                    this.deleteFileToken(fToken);
                     return true;
                 } else {
                     this.log.info("Regkey is expired.");
@@ -205,6 +233,23 @@ export class Spire extends EventEmitter {
             }
         });
 
+        this.api.get("/token/file", async (req, res) => {
+            try {
+                this.log.info("New file token requested.");
+                const token = this.createRegKey();
+                this.log.info("New token created: " + token.key);
+
+                setTimeout(() => {
+                    this.deleteFileToken(token);
+                }, 1000 * 60 * 5);
+
+                return res.status(201).send(token);
+            } catch (err) {
+                this.log.error(err.toString());
+                return res.sendStatus(500);
+            }
+        });
+
         this.api.get("/file/:id", async (req, res) => {
             const entry = await this.db.retrieveFile(req.params.id);
             if (!entry) {
@@ -239,13 +284,13 @@ export class Spire extends EventEmitter {
                 return;
             }
 
-            const data = nacl.sign.open(
+            const token = nacl.sign.open(
                 XUtils.decodeHex(payload.signed),
                 XUtils.decodeHex(userEntry.signKey)
             );
-            if (!data) {
-                console.warn("Bad signature on file.");
-                res.sendStatus(500);
+            if (!token) {
+                console.warn("Bad signature on token.");
+                res.sendStatus(401);
                 return;
             }
 
@@ -255,10 +300,16 @@ export class Spire extends EventEmitter {
                 nonce: payload.nonce,
             };
 
+            this.log.info(JSON.stringify(payload));
+
             // write the file to disk
-            fs.writeFile("files/" + newFile.fileID, data, () => {
-                this.log.info("Wrote new file " + newFile.fileID);
-            });
+            fs.writeFile(
+                "files/" + newFile.fileID,
+                Buffer.from(payload.file.data),
+                () => {
+                    this.log.info("Wrote new file " + newFile.fileID);
+                }
+            );
 
             await this.db.createFile(newFile);
             res.send(newFile);
