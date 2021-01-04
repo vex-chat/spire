@@ -252,6 +252,13 @@
   dependencies:
     tweetnacl "^1.0.3"
 
+"@vex-chat/types@^0.8.1":
+  version "0.8.1"
+  resolved "https://registry.yarnpkg.com/@vex-chat/types/-/types-0.8.1.tgz#0e8503ba21ac6de0e3a1d2a3339b7058de1b84f4"
+  integrity sha512-Yt84aIXq4PJ4hQXCqBgo//yE2xviO1xEIJAAXgUCNP0fQmUjh6zG9GXrccDBZjAiSPHp0fnHFYdJF+kVwPPxnQ==
+  dependencies:
+    tweetnacl "^1.0.3"
+
 abbrev@1:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/abbrev/-/abbrev-1.1.1.tgz#f8f2c887ad10bf67f634f005b6987fed3179aac8"

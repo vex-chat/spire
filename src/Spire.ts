@@ -275,7 +275,7 @@ export class Spire extends EventEmitter {
         });
 
         this.api.post("/file", async (req, res) => {
-            const payload: XTypes.HTTP.IFilePayload = req.body;
+            const payload: IServerSideFilePayload = req.body;
 
             const userEntry = await this.db.retrieveUser(payload.owner);
             if (!userEntry) {
@@ -421,3 +421,13 @@ export class Spire extends EventEmitter {
 const jestRun = () => {
     return process.env.JEST_WORKER_ID !== undefined;
 };
+
+interface IServerSideFilePayload {
+    owner: string;
+    signed: string;
+    nonce: string;
+    file: {
+        type: string;
+        data: number[];
+    };
+}
