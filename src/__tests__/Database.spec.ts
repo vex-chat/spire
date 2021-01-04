@@ -18,8 +18,12 @@ afterAll(async () => {
 describe("Database", () => {
     const TABLES = ["oneTimeKeys", "preKeys"];
 
+    // Reusable test data
     const keyID = "1480f261c80b8dbce4f4";
     const userID = "29c31922344590d153c6";
+
+    const publicKey = Uint8Array.from([...Buffer.from("0ce08f1a948893af0565")]);
+    const signature = Uint8Array.from([...Buffer.from("1d81e20cbfbbbe3a5248")]);
 
     beforeEach(async () => {
         await Promise.all(
@@ -47,13 +51,6 @@ describe("Database", () => {
                 index: 1,
             };
 
-            const publicKey = Uint8Array.from([
-                ...Buffer.from("0ce08f1a948893af0565"),
-            ]);
-            const signature = Uint8Array.from([
-                ...Buffer.from("1d81e20cbfbbbe3a5248"),
-            ]);
-
             // Act
             const provider = new Database(db);
             await provider.saveOTK(expectedOTK.userID, {
@@ -71,6 +68,56 @@ describe("Database", () => {
     });
 
     describe("getPreKeys", () => {
+        it("returns a preKey by userId if said preKey exists.", async () => {
+            // Arrange
+            expect.assertions(1); // in case there are async issues the test will fail in ci
+
+            const testPreKey: XTypes.SQL.IPreKeys = {
+                userID,
+                keyID,
+                publicKey: "0ce08f1a948893af0565",
+                signature: "1d81e20cbfbbbe3a5248",
+                index: 1,
+            };
+
+            const expectedPreKey: XTypes.WS.IPreKeys = {
+                publicKey: new Uint8Array([
+                    12,
+                    224,
+                    143,
+                    26,
+                    148,
+                    136,
+                    147,
+                    175,
+                    5,
+                    101,
+                ]),
+                signature: new Uint8Array([
+                    29,
+                    129,
+                    226,
+                    12,
+                    191,
+                    187,
+                    190,
+                    58,
+                    82,
+                    72,
+                ]),
+                index: 1,
+            };
+
+            await db("preKeys").insert(testPreKey);
+
+            // Act
+            const provider = new Database(db);
+            const result = await provider.getPreKeys(userID);
+
+            // Assert
+            expect(result).toEqual(expectedPreKey);
+        });
+
         it("return null if there are no preKeys with userId param", async () => {
             // Arrange
             expect.assertions(1); // in case there are async issues the test will fail in ci
