@@ -498,6 +498,7 @@ export class ClientManager extends EventEmitter {
                     this.sendSuccess(msg.transmissionID, []);
                 }
                 if (msg.action === "CREATE") {
+                    // resourceID is serverID
                     const { serverID, name } = msg.data;
                     const permissions = await this.db.retrievePermissions(
                         this.getUser().userID,
@@ -559,6 +560,7 @@ export class ClientManager extends EventEmitter {
                                 channel.serverID,
                                 msg.transmissionID
                             );
+                            found = true;
                             break;
                         }
                     }

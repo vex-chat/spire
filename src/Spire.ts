@@ -7,6 +7,7 @@ import expressWs from "express-ws";
 import fs from "fs";
 import helmet from "helmet";
 import { Server } from "http";
+import knex from "knex";
 import morgan from "morgan";
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
@@ -48,6 +49,8 @@ export class Spire extends EventEmitter {
     private wss: WebSocket.Server = this.expWs.getWss();
 
     private regKeys: XTypes.HTTP.IRegKey[] = [];
+    private fileKeys: XTypes.HTTP.IRegKey[] = [];
+
     private log: winston.Logger;
     private server: Server | null = null;
     private options: ISpireOptions | undefined;
@@ -55,7 +58,44 @@ export class Spire extends EventEmitter {
     constructor(options?: ISpireOptions) {
         super();
 
-        this.db = new Database(options);
+        // Move this logic form Database class into Spire until test coverage increases
+        switch (options?.dbType || "mysql") {
+            case "sqlite3":
+                const sql3 = knex({
+                    client: "sqlite3",
+                    connection: {
+                        filename: "spire.sqlite",
+                    },
+                    useNullAsDefault: true,
+                });
+
+                this.db = new Database(sql3, options);
+                break;
+            case "sqlite3mem":
+                const sql3mem = knex({
+                    client: "sqlite3",
+                    connection: {
+                        filename: ":memory:",
+                    },
+                    useNullAsDefault: true,
+                });
+                this.db = new Database(sql3mem, options);
+                break;
+            case "mysql":
+            default:
+                const mysql = knex({
+                    client: "mysql",
+                    connection: {
+                        host: process.env.SQL_HOST,
+                        user: process.env.SQL_USER,
+                        password: process.env.SQL_PASSWORD,
+                        database: process.env.SQL_DB_NAME,
+                    },
+                });
+                this.db = new Database(mysql, options);
+                break;
+        }
+
         this.log = createLogger("spire", options?.logLevel || "error");
         this.init(options?.apiPort || 16777);
 
@@ -115,6 +155,12 @@ export class Spire extends EventEmitter {
         }
     }
 
+    private deleteFileToken(key: XTypes.HTTP.IRegKey) {
+        if (this.fileKeys.includes(key)) {
+            this.fileKeys.splice(this.fileKeys.indexOf(key), 1);
+        }
+    }
+
     private validRegKey(key: string): boolean {
         this.log.info("Validating regkey: " + key);
         for (const rKey of this.regKeys) {
@@ -135,8 +181,28 @@ export class Spire extends EventEmitter {
         return false;
     }
 
+    private validFileToken(key: string): boolean {
+        this.log.info("Validating regkey: " + key);
+        for (const fToken of this.fileKeys) {
+            if (fToken.key === key) {
+                const age =
+                    new Date(Date.now()).getTime() - fToken.time.getTime();
+                this.log.info("Regkey found, " + age + " ms old.");
+                if (age < 1000 * 60 * 5) {
+                    this.log.info("Regkey is valid.");
+                    this.deleteFileToken(fToken);
+                    return true;
+                } else {
+                    this.log.info("Regkey is expired.");
+                }
+            }
+        }
+        this.log.info("Regkey not found.");
+        return false;
+    }
+
     private init(apiPort: number): void {
-        this.api.use(express.json());
+        this.api.use(express.json({ limit: "20mb" }));
         this.api.use(helmet());
 
         if (!jestRun()) {
@@ -205,6 +271,23 @@ export class Spire extends EventEmitter {
             }
         });
 
+        this.api.get("/token/file", async (req, res) => {
+            try {
+                this.log.info("New file token requested.");
+                const token = this.createRegKey();
+                this.log.info("New token created: " + token.key);
+
+                setTimeout(() => {
+                    this.deleteFileToken(token);
+                }, 1000 * 60 * 5);
+
+                return res.status(201).send(token);
+            } catch (err) {
+                this.log.error(err.toString());
+                return res.sendStatus(500);
+            }
+        });
+
         this.api.get("/file/:id", async (req, res) => {
             const entry = await this.db.retrieveFile(req.params.id);
             if (!entry) {
@@ -230,7 +313,7 @@ export class Spire extends EventEmitter {
         });
 
         this.api.post("/file", async (req, res) => {
-            const payload: XTypes.HTTP.IFilePayload = req.body;
+            const payload: IServerSideFilePayload = req.body;
 
             const userEntry = await this.db.retrieveUser(payload.owner);
             if (!userEntry) {
@@ -239,13 +322,13 @@ export class Spire extends EventEmitter {
                 return;
             }
 
-            const data = nacl.sign.open(
+            const token = nacl.sign.open(
                 XUtils.decodeHex(payload.signed),
                 XUtils.decodeHex(userEntry.signKey)
             );
-            if (!data) {
-                console.warn("Bad signature on file.");
-                res.sendStatus(500);
+            if (!token) {
+                console.warn("Bad signature on token.");
+                res.sendStatus(401);
                 return;
             }
 
@@ -255,10 +338,16 @@ export class Spire extends EventEmitter {
                 nonce: payload.nonce,
             };
 
+            this.log.info(JSON.stringify(payload));
+
             // write the file to disk
-            fs.writeFile("files/" + newFile.fileID, data, () => {
-                this.log.info("Wrote new file " + newFile.fileID);
-            });
+            fs.writeFile(
+                "files/" + newFile.fileID,
+                Buffer.from(payload.file.data),
+                () => {
+                    this.log.info("Wrote new file " + newFile.fileID);
+                }
+            );
 
             await this.db.createFile(newFile);
             res.send(newFile);
@@ -370,3 +459,13 @@ export class Spire extends EventEmitter {
 const jestRun = () => {
     return process.env.JEST_WORKER_ID !== undefined;
 };
+
+interface IServerSideFilePayload {
+    owner: string;
+    signed: string;
+    nonce: string;
+    file: {
+        type: string;
+        data: number[];
+    };
+}
