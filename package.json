@@ -7,7 +7,7 @@
     "license": "AGPL-3.0-or-later",
     "scripts": {
         "start": "node ./dist/run.js",
-        "restart": "pm2 restart 0",
+        "restart": "pm2 restart spire && pm2 logs spire",
         "build": "node ./node_modules/typescript/bin/tsc",
         "prettier": "node ./node_modules/prettier/bin-prettier.js '**/*.{ts,tsx,json,md}' --tab-width 4 --trailing-comma es5 --ignore-path .gitignore  --arrow-parens always --write",
         "lint": "./node_modules/tslint/bin/tslint src/**/*.ts{,x}",

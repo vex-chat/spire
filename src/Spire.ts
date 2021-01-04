@@ -136,7 +136,7 @@ export class Spire extends EventEmitter {
     }
 
     private init(apiPort: number): void {
-        this.api.use(express.json());
+        this.api.use(express.json({ limit: "20mb" }));
         this.api.use(helmet());
 
         if (!jestRun()) {
