@@ -1,4 +1,4 @@
-jest.mock("uuid", () => ({ v4: () => "1480f261c80b8dbce4f4" }));
+jest.mock("uuid", () => ({ v4: () => "17e059c2-37fc-471e-9f4c-6fb0027263da" }));
 
 import { XTypes } from "@vex-chat/types";
 import uuid from "uuid";
