@@ -505,7 +505,6 @@ export class ClientManager extends EventEmitter {
                         "server"
                     );
                     let found = false;
-                    console.log("Checking permissions.");
                     for (const permission of permissions) {
                         if (
                             permission.resourceID === serverID &&
