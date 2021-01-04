@@ -31,17 +31,17 @@ describe("Database", () => {
 
             const expectedOTK: XTypes.SQL.IPreKeys = {
                 keyID,
-                userID: "29c31922344590d153c6",
-                publicKey: "3063653038663161393438383933616630353635",
-                signature: "3164383165323063626662626265336135323438",
+                userID: "36913cd5-8285-4cd0-8ceb-8b5769c044c8",
+                publicKey: "9495c2e47685a26e753c03acb5ba7da202408a2edb320c1ac4291d6cc7b9d973",
+                signature: "503ef6f60ecc807177dbbb86f5ed7a071ba9cf0f268eb312e669f501b36afa3ace88a96c7b37ff13802cd3c6fefce19286e9f4f3216e3da0d50a22118242960a00019495c2e47685a26e753c03acb5ba7da202408a2edb320c1ac4291d6cc7b9d973",
                 index: 1,
             };
 
             const publicKey = Uint8Array.from([
-                ...Buffer.from("0ce08f1a948893af0565"),
+                ...Buffer.from(expectedOTK.publicKey),
             ]);
             const signature = Uint8Array.from([
-                ...Buffer.from("1d81e20cbfbbbe3a5248"),
+                ...Buffer.from(expectedOTK.signature),
             ]);
 
             // Act
