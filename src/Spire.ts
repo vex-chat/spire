@@ -4,12 +4,14 @@ import cors from "cors";
 import { EventEmitter } from "events";
 import express from "express";
 import expressWs from "express-ws";
+import FileType from "file-type";
 import fs from "fs";
 import helmet from "helmet";
 import { Server } from "http";
 import knex from "knex";
 import morgan from "morgan";
 import multer from "multer";
+import path from "path";
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
 import winston from "winston";
@@ -307,32 +309,49 @@ export class Spire extends EventEmitter {
             if (!entry) {
                 res.sendStatus(404);
             } else {
-                fs.readFile("files/" + entry.fileID, undefined, (err, file) => {
-                    if (err) {
-                        this.log.error("error reading file");
-                        res.sendStatus(500);
-                    } else {
-                        // TODO: fix this as well, its bloating the size
-                        const resp: XTypes.HTTP.IFileResponse = {
-                            details: entry,
-                            data: file,
-                        };
-                        res.send(resp);
+                fs.readFile(
+                    path.resolve("./files/" + entry.fileID),
+                    undefined,
+                    async (err, file) => {
+                        if (err) {
+                            this.log.error("error reading file");
+                            this.log.error(err);
+                            res.sendStatus(500);
+                        } else {
+                            const typeDetails = await FileType.fromBuffer(file);
+                            // TODO: fix this as well, its bloating the size
+                            const resp: XTypes.HTTP.IFileResponse = {
+                                details: entry,
+                                data: file,
+                            };
+                            if (typeDetails) {
+                                res.set("Content-type", typeDetails.mime);
+                            }
+                            res.send(resp);
+                        }
                     }
-                });
+                );
             }
         });
 
         this.api.get("/avatar/:userID", async (req, res) => {
-            fs.readFile("avatars/" + req.params.userID, (err, buf) => {
-                if (err) {
-                    // this isn't working for some reason,
-                    // returning 500
-                    res.sendStatus(404);
-                    return;
+            fs.readFile(
+                path.resolve("./avatars/" + req.params.userID),
+                undefined,
+                async (err, file) => {
+                    if (err) {
+                        this.log.error("error reading file");
+                        this.log.error(err);
+                        res.sendStatus(500);
+                    } else {
+                        const typeDetails = await FileType.fromBuffer(file);
+                        if (typeDetails) {
+                            res.set("Content-type", typeDetails.mime);
+                        }
+                        res.send(file);
+                    }
                 }
-                res.send(buf);
-            });
+            );
         });
 
         this.api.post(
@@ -360,7 +379,7 @@ export class Spire extends EventEmitter {
                 try {
                     // write the file to disk
                     fs.writeFile(
-                        "avatars/" + userEntry.userID,
+                        "avatars/" + userEntry.userID + ".png",
                         req.file.buffer,
                         () => {
                             this.log.info(
