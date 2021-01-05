@@ -19,13 +19,16 @@ import { Database } from "./Database";
 import { createLogger } from "./utils/createLogger";
 
 // expiry of regkeys
-export const EXPIRY_TIME = 10000;
+export const EXPIRY_TIME = 1000 * 60 * 5;
 
 // 3-19 chars long
 const usernameRegex = /^(\w{3,19})$/;
 
-if (!fs.existsSync("files")) {
-    fs.mkdirSync("files");
+const directories = ["files", "avatars"];
+for (const dir of directories) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir);
+    }
 }
 
 export interface ISpireOptions {
@@ -49,8 +52,7 @@ export class Spire extends EventEmitter {
     private api = this.expWs.app;
     private wss: WebSocket.Server = this.expWs.getWss();
 
-    private regKeys: XTypes.HTTP.IRegKey[] = [];
-    private fileKeys: XTypes.HTTP.IRegKey[] = [];
+    private actionTokens: IActionToken[] = [];
 
     private log: winston.Logger;
     private server: Server | null = null;
@@ -141,57 +143,36 @@ export class Spire extends EventEmitter {
         }
     }
 
-    private createRegKey(): XTypes.HTTP.IRegKey {
-        const key: XTypes.HTTP.IRegKey = {
+    private createActionToken(scope: TokenScopes): IActionToken {
+        const token: IActionToken = {
             key: uuid.v4(),
             time: new Date(Date.now()),
+            scope,
         };
-        this.regKeys.push(key);
-        return key;
+        this.actionTokens.push(token);
+        return token;
     }
 
-    private deleteRegKey(key: XTypes.HTTP.IRegKey) {
-        if (this.regKeys.includes(key)) {
-            this.regKeys.splice(this.regKeys.indexOf(key), 1);
+    private deleteActionToken(key: IActionToken) {
+        if (this.actionTokens.includes(key)) {
+            this.actionTokens.splice(this.actionTokens.indexOf(key), 1);
         }
     }
 
-    private deleteFileToken(key: XTypes.HTTP.IRegKey) {
-        if (this.fileKeys.includes(key)) {
-            this.fileKeys.splice(this.fileKeys.indexOf(key), 1);
-        }
-    }
-
-    private validRegKey(key: string): boolean {
-        this.log.info("Validating regkey: " + key);
-        for (const rKey of this.regKeys) {
+    private validateToken(key: string, scope: TokenScopes): boolean {
+        this.log.info("Validating token: " + key);
+        for (const rKey of this.actionTokens) {
             if (rKey.key === key) {
+                if (rKey.scope !== scope) {
+                    continue;
+                }
+
                 const age =
                     new Date(Date.now()).getTime() - rKey.time.getTime();
                 this.log.info("Regkey found, " + age + " ms old.");
                 if (age < EXPIRY_TIME) {
                     this.log.info("Regkey is valid.");
-                    this.deleteRegKey(rKey);
-                    return true;
-                } else {
-                    this.log.info("Regkey is expired.");
-                }
-            }
-        }
-        this.log.info("Regkey not found.");
-        return false;
-    }
-
-    private validFileToken(key: string): boolean {
-        this.log.info("Validating regkey: " + key);
-        for (const fToken of this.fileKeys) {
-            if (fToken.key === key) {
-                const age =
-                    new Date(Date.now()).getTime() - fToken.time.getTime();
-                this.log.info("Regkey found, " + age + " ms old.");
-                if (age < 1000 * 60 * 5) {
-                    this.log.info("Regkey is valid.");
-                    this.deleteFileToken(fToken);
+                    this.deleteActionToken(rKey);
                     return true;
                 } else {
                     this.log.info("Regkey is expired.");
@@ -275,11 +256,11 @@ export class Spire extends EventEmitter {
         this.api.get("/token/file", async (req, res) => {
             try {
                 this.log.info("New file token requested.");
-                const token = this.createRegKey();
+                const token = this.createActionToken(TokenScopes.File);
                 this.log.info("New token created: " + token.key);
 
                 setTimeout(() => {
-                    this.deleteFileToken(token);
+                    this.deleteActionToken(token);
                 }, 1000 * 60 * 5);
 
                 return res.status(201).send(token);
@@ -308,6 +289,47 @@ export class Spire extends EventEmitter {
                 });
             }
         });
+
+        this.api.post(
+            "/avatar/:userID",
+            multer().single("avatar"),
+            async (req, res) => {
+                const payload: XTypes.HTTP.IFilePayload = req.body;
+                const userEntry = await this.db.retrieveUser(req.params.userID);
+
+                if (!userEntry) {
+                    res.sendStatus(404);
+                    return;
+                }
+
+                const token = nacl.sign.open(
+                    XUtils.decodeHex(payload.signed),
+                    XUtils.decodeHex(userEntry.signKey)
+                );
+                if (!token) {
+                    console.warn("Bad signature on token.");
+                    res.sendStatus(401);
+                    return;
+                }
+
+                try {
+                    // write the file to disk
+                    fs.writeFile(
+                        "avatars/" + userEntry.userID,
+                        req.file.buffer,
+                        () => {
+                            this.log.info(
+                                "Wrote new avatar " + userEntry.userID
+                            );
+                        }
+                    );
+                    res.sendStatus(200);
+                } catch (err) {
+                    this.log.warn(err);
+                    res.sendStatus(500);
+                }
+            }
+        );
 
         this.api.get("/canary", async (req, res) => {
             res.send({ canary: process.env.CANARY });
@@ -339,8 +361,6 @@ export class Spire extends EventEmitter {
                 nonce: payload.nonce,
             };
 
-            this.log.info(JSON.stringify(payload));
-
             // write the file to disk
             fs.writeFile("files/" + newFile.fileID, req.file.buffer, () => {
                 this.log.info("Wrote new file " + newFile.fileID);
@@ -353,11 +373,11 @@ export class Spire extends EventEmitter {
         this.api.post("/register/key", (req, res) => {
             try {
                 this.log.info("New regkey requested.");
-                const regKey = this.createRegKey();
+                const regKey = this.createActionToken(TokenScopes.Register);
                 this.log.info("New regkey created: " + regKey.key);
 
                 setTimeout(() => {
-                    this.deleteRegKey(regKey);
+                    this.deleteActionToken(regKey);
                 }, EXPIRY_TIME);
 
                 return res.status(201).send(regKey);
@@ -384,7 +404,13 @@ export class Spire extends EventEmitter {
                     XUtils.decodeHex(regPayload.signed),
                     XUtils.decodeHex(regPayload.signKey)
                 );
-                if (regKey && this.validRegKey(uuid.stringify(regKey))) {
+                if (
+                    regKey &&
+                    this.validateToken(
+                        uuid.stringify(regKey),
+                        TokenScopes.Register
+                    )
+                ) {
                     const [user, err] = await this.db.createUser(
                         regKey,
                         regPayload

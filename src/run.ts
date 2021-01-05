@@ -5,7 +5,7 @@ async function main() {
     // load the environment variables
     loadEnv();
     const server = new Spire({
-        logLevel: "warn",
+        logLevel: "info",
     });
 }
 
