@@ -52,7 +52,7 @@ export class Spire extends EventEmitter {
     private api = this.expWs.app;
     private wss: WebSocket.Server = this.expWs.getWss();
 
-    private actionTokens: IActionToken[] = [];
+    private actionTokens: XTypes.HTTP.IActionToken[] = [];
 
     private log: winston.Logger;
     private server: Server | null = null;
@@ -143,8 +143,10 @@ export class Spire extends EventEmitter {
         }
     }
 
-    private createActionToken(scope: TokenScopes): IActionToken {
-        const token: IActionToken = {
+    private createActionToken(
+        scope: XTypes.HTTP.TokenScopes
+    ): XTypes.HTTP.IActionToken {
+        const token: XTypes.HTTP.IActionToken = {
             key: uuid.v4(),
             time: new Date(Date.now()),
             scope,
@@ -153,13 +155,16 @@ export class Spire extends EventEmitter {
         return token;
     }
 
-    private deleteActionToken(key: IActionToken) {
+    private deleteActionToken(key: XTypes.HTTP.IActionToken) {
         if (this.actionTokens.includes(key)) {
             this.actionTokens.splice(this.actionTokens.indexOf(key), 1);
         }
     }
 
-    private validateToken(key: string, scope: TokenScopes): boolean {
+    private validateToken(
+        key: string,
+        scope: XTypes.HTTP.TokenScopes
+    ): boolean {
         this.log.info("Validating token: " + key);
         for (const rKey of this.actionTokens) {
             if (rKey.key === key) {
@@ -253,15 +258,40 @@ export class Spire extends EventEmitter {
             }
         });
 
-        this.api.get("/token/file", async (req, res) => {
+        this.api.get("/token/:tokenType", async (req, res) => {
+            const allowedTokens = ["file", "register", "avatar"];
+
+            const { tokenType } = req.params;
+            if (!allowedTokens.includes(tokenType)) {
+                res.sendStatus(401);
+                return;
+            }
+
+            let scope;
+
+            switch (tokenType) {
+                case "file":
+                    scope = XTypes.HTTP.TokenScopes.File;
+                    break;
+                case "register":
+                    scope = XTypes.HTTP.TokenScopes.Register;
+                    break;
+                case "avatar":
+                    scope = XTypes.HTTP.TokenScopes.Avatar;
+                    break;
+                default:
+                    res.sendStatus(400);
+                    return;
+            }
+
             try {
-                this.log.info("New file token requested.");
-                const token = this.createActionToken(TokenScopes.File);
+                this.log.info("New token requested of type " + tokenType);
+                const token = this.createActionToken(scope);
                 this.log.info("New token created: " + token.key);
 
                 setTimeout(() => {
                     this.deleteActionToken(token);
-                }, 1000 * 60 * 5);
+                }, EXPIRY_TIME);
 
                 return res.status(201).send(token);
             } catch (err) {
@@ -373,7 +403,9 @@ export class Spire extends EventEmitter {
         this.api.post("/register/key", (req, res) => {
             try {
                 this.log.info("New regkey requested.");
-                const regKey = this.createActionToken(TokenScopes.Register);
+                const regKey = this.createActionToken(
+                    XTypes.HTTP.TokenScopes.Register
+                );
                 this.log.info("New regkey created: " + regKey.key);
 
                 setTimeout(() => {
@@ -408,7 +440,7 @@ export class Spire extends EventEmitter {
                     regKey &&
                     this.validateToken(
                         uuid.stringify(regKey),
-                        TokenScopes.Register
+                        XTypes.HTTP.TokenScopes.Register
                     )
                 ) {
                     const [user, err] = await this.db.createUser(
