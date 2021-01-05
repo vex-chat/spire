@@ -131,7 +131,7 @@ export class ClientManager extends EventEmitter {
         if (this.failed) {
             return;
         }
-        this.log.warn("Connection failed.");
+        this.log.warn("Connection closed.");
         if (this.conn) {
             this.conn.close();
         }

@@ -9,6 +9,7 @@ import helmet from "helmet";
 import { Server } from "http";
 import knex from "knex";
 import morgan from "morgan";
+import multer from "multer";
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
 import winston from "winston";
@@ -312,8 +313,8 @@ export class Spire extends EventEmitter {
             res.send({ canary: process.env.CANARY });
         });
 
-        this.api.post("/file", async (req, res) => {
-            const payload: IServerSideFilePayload = req.body;
+        this.api.post("/file", multer().single("file"), async (req, res) => {
+            const payload: XTypes.HTTP.IFilePayload = req.body;
 
             const userEntry = await this.db.retrieveUser(payload.owner);
             if (!userEntry) {
@@ -341,13 +342,9 @@ export class Spire extends EventEmitter {
             this.log.info(JSON.stringify(payload));
 
             // write the file to disk
-            fs.writeFile(
-                "files/" + newFile.fileID,
-                Buffer.from(payload.file.data),
-                () => {
-                    this.log.info("Wrote new file " + newFile.fileID);
-                }
-            );
+            fs.writeFile("files/" + newFile.fileID, req.file.buffer, () => {
+                this.log.info("Wrote new file " + newFile.fileID);
+            });
 
             await this.db.createFile(newFile);
             res.send(newFile);
@@ -459,13 +456,3 @@ export class Spire extends EventEmitter {
 const jestRun = () => {
     return process.env.JEST_WORKER_ID !== undefined;
 };
-
-interface IServerSideFilePayload {
-    owner: string;
-    signed: string;
-    nonce: string;
-    file: {
-        type: string;
-        data: number[];
-    };
-}
