@@ -304,6 +304,7 @@ export class Spire extends EventEmitter {
 
         this.api.get("/file/:id", async (req, res) => {
             const entry = await this.db.retrieveFile(req.params.id);
+            res.set("Cache-control", "public, max-age=31536000");
             if (!entry) {
                 res.sendStatus(404);
             } else {
@@ -324,6 +325,7 @@ export class Spire extends EventEmitter {
         });
 
         this.api.get("/avatar/:userID", async (req, res) => {
+            res.set("Cache-control", "public, max-age=31536000");
             fs.readFile("avatars/" + req.params.userID, (err, buf) => {
                 if (err) {
                     res.sendStatus(500);
