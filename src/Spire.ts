@@ -265,7 +265,7 @@ export class Spire extends EventEmitter {
 
             const { tokenType } = req.params;
             if (!allowedTokens.includes(tokenType)) {
-                res.sendStatus(401);
+                res.sendStatus(400);
                 return;
             }
 
@@ -304,7 +304,6 @@ export class Spire extends EventEmitter {
 
         this.api.get("/file/:id", async (req, res) => {
             const entry = await this.db.retrieveFile(req.params.id);
-            res.set("Cache-control", "public, max-age=31536000");
             if (!entry) {
                 res.sendStatus(404);
             } else {
@@ -325,10 +324,11 @@ export class Spire extends EventEmitter {
         });
 
         this.api.get("/avatar/:userID", async (req, res) => {
-            res.set("Cache-control", "public, max-age=31536000");
             fs.readFile("avatars/" + req.params.userID, (err, buf) => {
                 if (err) {
-                    res.sendStatus(500);
+                    // this isn't working for some reason,
+                    // returning 500
+                    res.sendStatus(404);
                     return;
                 }
                 res.send(buf);
@@ -382,6 +382,11 @@ export class Spire extends EventEmitter {
 
         this.api.post("/file", multer().single("file"), async (req, res) => {
             const payload: XTypes.HTTP.IFilePayload = req.body;
+
+            if (payload.nonce === "") {
+                res.sendStatus(400);
+                return;
+            }
 
             const userEntry = await this.db.retrieveUser(payload.owner);
             if (!userEntry) {
