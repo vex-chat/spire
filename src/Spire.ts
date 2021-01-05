@@ -31,6 +31,8 @@ for (const dir of directories) {
     }
 }
 
+const TokenScopes = XTypes.HTTP.TokenScopes;
+
 export interface ISpireOptions {
     logLevel?:
         | "error"
@@ -271,13 +273,13 @@ export class Spire extends EventEmitter {
 
             switch (tokenType) {
                 case "file":
-                    scope = XTypes.HTTP.TokenScopes.File;
+                    scope = TokenScopes.File;
                     break;
                 case "register":
-                    scope = XTypes.HTTP.TokenScopes.Register;
+                    scope = TokenScopes.Register;
                     break;
                 case "avatar":
-                    scope = XTypes.HTTP.TokenScopes.Avatar;
+                    scope = TokenScopes.Avatar;
                     break;
                 default:
                     res.sendStatus(400);
@@ -310,6 +312,7 @@ export class Spire extends EventEmitter {
                         this.log.error("error reading file");
                         res.sendStatus(500);
                     } else {
+                        // TODO: fix this as well, its bloating the size
                         const resp: XTypes.HTTP.IFileResponse = {
                             details: entry,
                             data: file,
@@ -318,6 +321,16 @@ export class Spire extends EventEmitter {
                     }
                 });
             }
+        });
+
+        this.api.get("/avatar/:userID", async (req, res) => {
+            fs.readFile("avatars/" + req.params.userID, (err, buf) => {
+                if (err) {
+                    res.sendStatus(500);
+                    return;
+                }
+                res.send(buf);
+            });
         });
 
         this.api.post(
@@ -403,9 +416,7 @@ export class Spire extends EventEmitter {
         this.api.post("/register/key", (req, res) => {
             try {
                 this.log.info("New regkey requested.");
-                const regKey = this.createActionToken(
-                    XTypes.HTTP.TokenScopes.Register
-                );
+                const regKey = this.createActionToken(TokenScopes.Register);
                 this.log.info("New regkey created: " + regKey.key);
 
                 setTimeout(() => {
@@ -440,7 +451,7 @@ export class Spire extends EventEmitter {
                     regKey &&
                     this.validateToken(
                         uuid.stringify(regKey),
-                        XTypes.HTTP.TokenScopes.Register
+                        TokenScopes.Register
                     )
                 ) {
                     const [user, err] = await this.db.createUser(
