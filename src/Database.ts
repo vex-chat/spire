@@ -527,7 +527,6 @@ export class Database extends EventEmitter {
                 table.string("userID").primary();
                 table.string("signKey").unique();
                 table.string("username").unique();
-                table.string("avatar");
                 table.dateTime("lastSeen");
             });
         }
