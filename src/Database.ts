@@ -198,11 +198,11 @@ export class Database extends EventEmitter {
         return otk;
     }
 
-    public async getOTKCount(userID: string): Promise<number> {
+    public async getOTKCount(deviceID: string): Promise<number> {
         const keys = await this.db
             .from("oneTimeKeys")
             .select()
-            .where({ userID });
+            .where({ deviceID });
         return keys.length;
     }
 
@@ -591,8 +591,8 @@ export class Database extends EventEmitter {
         if (!(await this.db.schema.hasTable("devices"))) {
             await this.db.schema.createTable("devices", (table) => {
                 table.string("deviceID").primary();
+                table.string("signKey").unique();
                 table.string("owner");
-                table.string("signKey");
             });
         }
         if (!(await this.db.schema.hasTable("mail"))) {

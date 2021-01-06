@@ -292,9 +292,7 @@ export class Spire extends EventEmitter {
                 return;
             }
 
-            if (
-                this.validateToken(XUtils.encodeHex(token), TokenScopes.Device)
-            ) {
+            if (this.validateToken(uuid.stringify(token), TokenScopes.Device)) {
                 await this.db.createDevice(
                     userEntry.userID,
                     devicePayload.signKey
@@ -316,7 +314,7 @@ export class Spire extends EventEmitter {
         });
 
         this.api.get("/token/:tokenType", async (req, res) => {
-            const allowedTokens = ["file", "register", "avatar"];
+            const allowedTokens = ["file", "register", "avatar", "device"];
 
             const { tokenType } = req.params;
             if (!allowedTokens.includes(tokenType)) {
@@ -336,8 +334,11 @@ export class Spire extends EventEmitter {
                 case "avatar":
                     scope = TokenScopes.Avatar;
                     break;
+                case "device":
+                    scope = TokenScopes.Device;
+                    break;
                 default:
-                    res.sendStatus(400);
+                    res.sendStatus(500);
                     return;
             }
 
