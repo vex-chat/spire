@@ -121,10 +121,22 @@ export class Database extends EventEmitter {
 
     public async createDevice(
         owner: string,
-        signKey: string
+        payload: XTypes.HTTP.IRegPayload
     ): Promise<XTypes.SQL.IDevice> {
-        const device = { owner, signKey, deviceID: uuid.v4() };
+        const device = { owner, signKey: payload.signKey, deviceID: uuid.v4() };
         await this.db("devices").insert(device);
+
+        const medPreKeys: XTypes.SQL.IPreKeys = {
+            keyID: uuid.v4(),
+            userID: owner,
+            deviceID: device.deviceID,
+            publicKey: payload.preKey,
+            signature: payload.preKeySignature,
+            index: payload.preKeyIndex,
+        };
+
+        await this.db("preKeys").insert(medPreKeys);
+
         return device;
     }
 
@@ -442,10 +454,7 @@ export class Database extends EventEmitter {
             };
 
             await this.db("users").insert(user);
-            const device = await this.createDevice(
-                user.userID,
-                regPayload.signKey
-            );
+            const device = await this.createDevice(user.userID, regPayload);
 
             const medPreKeys: XTypes.SQL.IPreKeys = {
                 keyID: uuid.v4(),

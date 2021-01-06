@@ -293,10 +293,7 @@ export class Spire extends EventEmitter {
             }
 
             if (this.validateToken(uuid.stringify(token), TokenScopes.Device)) {
-                await this.db.createDevice(
-                    userEntry.userID,
-                    devicePayload.signKey
-                );
+                await this.db.createDevice(userEntry.userID, devicePayload);
                 res.sendStatus(200);
             } else {
                 res.sendStatus(401);
