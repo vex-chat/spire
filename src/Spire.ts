@@ -65,43 +65,7 @@ export class Spire extends EventEmitter {
     constructor(options?: ISpireOptions) {
         super();
 
-        // Move this logic form Database class into Spire until test coverage increases
-        switch (options?.dbType || "mysql") {
-            case "sqlite3":
-                const sql3 = knex({
-                    client: "sqlite3",
-                    connection: {
-                        filename: "spire.sqlite",
-                    },
-                    useNullAsDefault: true,
-                });
-
-                this.db = new Database(sql3, options);
-                break;
-            case "sqlite3mem":
-                const sql3mem = knex({
-                    client: "sqlite3",
-                    connection: {
-                        filename: ":memory:",
-                    },
-                    useNullAsDefault: true,
-                });
-                this.db = new Database(sql3mem, options);
-                break;
-            case "mysql":
-            default:
-                const mysql = knex({
-                    client: "mysql",
-                    connection: {
-                        host: process.env.SQL_HOST,
-                        user: process.env.SQL_USER,
-                        password: process.env.SQL_PASSWORD,
-                        database: process.env.SQL_DB_NAME,
-                    },
-                });
-                this.db = new Database(mysql, options);
-                break;
-        }
+        this.db = new Database(options);
 
         this.log = createLogger("spire", options?.logLevel || "error");
         this.init(options?.apiPort || 16777);

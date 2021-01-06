@@ -1,5 +1,6 @@
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
+import { EventEmitter } from "events";
 import knex from "knex";
 import * as uuid from "uuid";
 import winston from "winston";
@@ -8,13 +9,48 @@ import { createLogger } from "./utils/createLogger";
 
 const pubkeyRegex = /[0-9a-f]{64}/;
 
-export class Database {
+export class Database extends EventEmitter {
     private db: knex<any, unknown[]>;
     private log: winston.Logger;
 
-    constructor(db: knex<any, unknown[]>, options?: ISpireOptions) {
+    constructor(options?: ISpireOptions) {
+        super();
+
         this.log = createLogger("spire-db", options?.logLevel || "error");
-        this.db = db;
+
+        switch (options?.dbType || "mysql") {
+            case "sqlite3":
+                this.db = knex({
+                    client: "sqlite3",
+                    connection: {
+                        filename: "spire.sqlite",
+                    },
+                    useNullAsDefault: true,
+                });
+                break;
+            case "sqlite3mem":
+                this.db = knex({
+                    client: "sqlite3",
+                    connection: {
+                        filename: ":memory:",
+                    },
+                    useNullAsDefault: true,
+                });
+                break;
+            case "mysql":
+            default:
+                this.db = knex({
+                    client: "mysql",
+                    connection: {
+                        host: process.env.SQL_HOST,
+                        user: process.env.SQL_USER,
+                        password: process.env.SQL_PASSWORD,
+                        database: process.env.SQL_DB_NAME,
+                    },
+                });
+                break;
+        }
+
         this.init();
     }
 
@@ -558,5 +594,7 @@ export class Database {
                 table.string("nonce");
             });
         }
+
+        this.emit("ready");
     }
 }

@@ -1,20 +1,16 @@
+// tslint:disable: no-string-literal
+
 jest.mock("uuid", () => ({ v4: () => "93ce482b-a0f2-4f6e-b1df-3aed61073552" }));
 
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
-import knex from "knex";
 import uuid from "uuid";
 import winston from "winston";
 
 import { Database } from "../Database";
-
-import { knexTestConfig } from "../knexfile";
+import { ISpireOptions } from "../Spire";
 
 describe("Database", () => {
-    const db = knex(knexTestConfig);
-
-    const TABLES = ["oneTimeKeys", "preKeys"];
-
     // Reusable test data
     const keyID = "de459e05-aa63-4dfa-97b4-ed43d5c7a5f7";
     const userID = "4e67b90f-cbf8-44bc-8ce3-d3b248f033f1";
@@ -42,24 +38,12 @@ describe("Database", () => {
         index: 1,
     };
 
-    beforeAll(() => {
-        return db.migrate.latest();
-    });
-
-    afterAll(() => {
-        return db.destroy();
-    });
-
-    beforeEach(() => {
-        return Promise.all(
-            TABLES.map(async (table) => {
-                await db(table).truncate();
-            })
-        );
-    });
+    const options: ISpireOptions = {
+        dbType: "sqlite3mem",
+    };
 
     describe("saveOTK", () => {
-        it("takes a userId and one time key, adds a keyId and saves it to oneTimeKey table", async () => {
+        it("takes a userId and one time key, adds a keyId and saves it to oneTimeKey table", async (done) => {
             // Arrange
             expect.assertions(1); // in case there are async issues the test will fail in ci
 
@@ -69,44 +53,52 @@ describe("Database", () => {
                 .mockReturnValueOnce(({} as unknown) as winston.Logger);
 
             // Act
-            const provider = new Database(db);
-            await provider.saveOTK(testSQLPreKey.userID, {
-                publicKey,
-                signature,
-                index: 1,
-            });
+            const provider = new Database(options);
+            provider.on("ready", async () => {
+                await provider.saveOTK(testSQLPreKey.userID, {
+                    publicKey,
+                    signature,
+                    index: 1,
+                });
 
-            // Assert
-            const oneTimeKeys = await db.select().from("oneTimeKeys");
-            expect(oneTimeKeys[0]).toEqual(testSQLPreKey);
+                // Assert
+                const oneTimeKey = await provider.getOTK(userID);
+                expect(oneTimeKey).toEqual(testWSPreKey);
+                done();
+            });
         });
     });
 
     describe("getPreKeys", () => {
-        it("returns a preKey by userId if said preKey exists.", async () => {
+        it("returns a preKey by userId if said preKey exists.", async (done) => {
             // Arrange
             expect.assertions(1); // in case there are async issues the test will fail in ci
 
-            await db("preKeys").insert(testSQLPreKey);
-
             // Act
-            const provider = new Database(db);
-            const result = await provider.getPreKeys(userID);
+            const provider = new Database(options);
 
-            // Assert
-            expect(result).toEqual(testWSPreKey);
+            provider.on("ready", async () => {
+                await provider["db"]("preKeys").insert(testSQLPreKey);
+                const result = await provider.getPreKeys(userID);
+
+                // Assert
+                expect(result).toEqual(testWSPreKey);
+                done();
+            });
         });
 
-        it("return null if there are no preKeys with userId param", async () => {
+        it("return null if there are no preKeys with userId param", async (done) => {
             // Arrange
             expect.assertions(1); // in case there are async issues the test will fail in ci
-
             // Act
-            const provider = new Database(db);
-            const result = await provider.getPreKeys(userID);
+            const provider = new Database(options);
+            provider.on("ready", async () => {
+                const result = await provider.getPreKeys(userID);
 
-            // Assert
-            expect(result).toBeNull();
+                // Assert
+                expect(result).toBeNull();
+                done();
+            });
         });
     });
 });
