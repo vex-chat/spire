@@ -15,11 +15,6 @@ export class Database {
     constructor(db: knex<any, unknown[]>, options?: ISpireOptions) {
         this.log = createLogger("spire-db", options?.logLevel || "error");
         this.db = db;
-
-        // To let in memory db for jest do migrations/rollbacks
-        if (process.env.NODE_ENV !== "test") {
-            this.init();
-        }
     }
 
     public async saveOTK(
