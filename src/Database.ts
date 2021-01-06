@@ -590,6 +590,7 @@ export class Database extends EventEmitter {
                 table.string("userID").primary();
                 table.string("username").unique();
                 table.string("passwordHash");
+                table.string("passwordSalt");
                 table.dateTime("lastSeen");
             });
         }

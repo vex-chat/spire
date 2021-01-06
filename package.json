@@ -1,6 +1,6 @@
 {
     "name": "@vex-chat/spire",
-    "version": "0.2.26",
+    "version": "0.3.1",
     "description": "Vex server implementation in NodeJS.",
     "main": "./dist/index.js",
     "author": "Extra <extrahash@protonmail.com>",
@@ -13,7 +13,8 @@
         "lint": "./node_modules/tslint/bin/tslint src/**/*.ts{,x}",
         "lint-fix": "./node_modules/tslint/bin/tslint src/**/*.ts{,x} --fix",
         "api-knex": "TS_NODE_COMPILER_OPTIONS='{ \"module\": \"commonjs\" }' knex --knexfile=./src/knexfile.ts",
-        "test": "jest"
+        "test": "jest",
+        "prepublish": "yarn build"
     },
     "devDependencies": {
         "husky": "^3.1.0",
