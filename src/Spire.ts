@@ -343,7 +343,7 @@ export class Spire extends EventEmitter {
                 try {
                     // write the file to disk
                     fs.writeFile(
-                        "avatars/" + userEntry.userID + ".png",
+                        "avatars/" + userEntry.userID,
                         req.file.buffer,
                         () => {
                             this.log.info(
