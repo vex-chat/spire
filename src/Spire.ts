@@ -362,7 +362,7 @@ export class Spire extends EventEmitter {
                     }
                 }
                 if (!token) {
-                    console.warn("Bad signature on token.");
+                    this.log.warn("Bad signature on token.");
                     res.sendStatus(401);
                     return;
                 }
@@ -393,8 +393,6 @@ export class Spire extends EventEmitter {
         this.api.post("/file", multer().single("file"), async (req, res) => {
             const payload: XTypes.HTTP.IFilePayload = req.body;
 
-            console.log(payload);
-
             if (payload.nonce === "") {
                 res.sendStatus(400);
                 return;
@@ -422,7 +420,7 @@ export class Spire extends EventEmitter {
                 }
             }
             if (!token) {
-                console.warn("Bad signature on token.");
+                this.log.warn("Bad signature on token.");
                 res.sendStatus(401);
                 return;
             }
