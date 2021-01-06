@@ -42,16 +42,16 @@ describe("Database", () => {
         index: 1,
     };
 
-    beforeAll(async () => {
-        await db.migrate.latest();
+    beforeAll(() => {
+        return db.migrate.latest();
     });
 
-    afterAll(async () => {
-        await db.destroy();
+    afterAll(() => {
+        return db.destroy();
     });
 
-    beforeEach(async () => {
-        await Promise.all(
+    beforeEach(() => {
+        return Promise.all(
             TABLES.map(async (table) => {
                 await db(table).truncate();
             })
@@ -85,7 +85,6 @@ describe("Database", () => {
     describe("getPreKeys", () => {
         it("returns a preKey by userId if said preKey exists.", async () => {
             // Arrange
-            // don't think this is necessary, there's a default timeout of 5 seconds
             expect.assertions(1); // in case there are async issues the test will fail in ci
 
             await db("preKeys").insert(testSQLPreKey);
