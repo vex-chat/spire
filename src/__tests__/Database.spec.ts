@@ -1,29 +1,54 @@
-jest.mock("uuid", () => ({ v4: () => "1480f261c80b8dbce4f4" }));
+jest.mock("uuid", () => ({ v4: () => "93ce482b-a0f2-4f6e-b1df-3aed61073552" }));
 
+import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
+import knex from "knex";
 import uuid from "uuid";
 import winston from "winston";
 
 import { Database } from "../Database";
-import { db } from "../db-config";
 
-beforeAll(async () => {
-    await db.migrate.latest();
-});
-
-afterAll(async () => {
-    await db.destroy();
-});
+import { knexTestConfig } from "../knexfile";
 
 describe("Database", () => {
+    const db = knex(knexTestConfig);
+
     const TABLES = ["oneTimeKeys", "preKeys"];
 
     // Reusable test data
-    const keyID = "1480f261c80b8dbce4f4";
-    const userID = "29c31922344590d153c6";
+    const keyID = "de459e05-aa63-4dfa-97b4-ed43d5c7a5f7";
+    const userID = "4e67b90f-cbf8-44bc-8ce3-d3b248f033f1";
 
-    const publicKey = Uint8Array.from([...Buffer.from("0ce08f1a948893af0565")]);
-    const signature = Uint8Array.from([...Buffer.from("1d81e20cbfbbbe3a5248")]);
+    const publicKey = XUtils.decodeHex(
+        "30c2d0294c1cfdbb73c6b3bbe6010088c2dba8384b04ff2e2b92172431d66b5e"
+    );
+    const signature = XUtils.decodeHex(
+        "dd0665079426c3efcf4dce9b1487e4aca132f8147581b3294c3f23ddd2b4ba8240a10082bd06805d7eb320d91af971da3306e11b60073ccc3d829710f5036004000030c2d0294c1cfdbb73c6b3bbe6010088c2dba8384b04ff2e2b92172431d66b5e"
+    );
+
+    const testSQLPreKey: XTypes.SQL.IPreKeys = {
+        userID,
+        keyID,
+        publicKey:
+            "30c2d0294c1cfdbb73c6b3bbe6010088c2dba8384b04ff2e2b92172431d66b5e",
+        signature:
+            "dd0665079426c3efcf4dce9b1487e4aca132f8147581b3294c3f23ddd2b4ba8240a10082bd06805d7eb320d91af971da3306e11b60073ccc3d829710f5036004000030c2d0294c1cfdbb73c6b3bbe6010088c2dba8384b04ff2e2b92172431d66b5e",
+        index: 1,
+    };
+
+    const testWSPreKey: XTypes.WS.IPreKeys = {
+        publicKey,
+        signature,
+        index: 1,
+    };
+
+    beforeAll(async () => {
+        await db.migrate.latest();
+    });
+
+    afterAll(async () => {
+        await db.destroy();
+    });
 
     beforeEach(async () => {
         await Promise.all(
@@ -43,79 +68,34 @@ describe("Database", () => {
                 .spyOn(winston, "createLogger")
                 .mockReturnValueOnce(({} as unknown) as winston.Logger);
 
-            const expectedOTK: XTypes.SQL.IPreKeys = {
-                keyID,
-                userID,
-                publicKey: "3063653038663161393438383933616630353635",
-                signature: "3164383165323063626662626265336135323438",
-                index: 1,
-            };
-
             // Act
             const provider = new Database(db);
-            await provider.saveOTK(expectedOTK.userID, {
+            await provider.saveOTK(testSQLPreKey.userID, {
                 publicKey,
                 signature,
                 index: 1,
             });
 
             // Assert
-            const oneTimeKeys = await db
-                .select()
-                .from<XTypes.WS.IPreKeys>("oneTimeKeys");
-            expect(oneTimeKeys[0]).toEqual(expectedOTK);
+            const oneTimeKeys = await db.select().from("oneTimeKeys");
+            expect(oneTimeKeys[0]).toEqual(testSQLPreKey);
         });
     });
 
     describe("getPreKeys", () => {
         it("returns a preKey by userId if said preKey exists.", async () => {
             // Arrange
+            // don't think this is necessary, there's a default timeout of 5 seconds
             expect.assertions(1); // in case there are async issues the test will fail in ci
 
-            const testPreKey: XTypes.SQL.IPreKeys = {
-                userID,
-                keyID,
-                publicKey: "0ce08f1a948893af0565",
-                signature: "1d81e20cbfbbbe3a5248",
-                index: 1,
-            };
-
-            const expectedPreKey: XTypes.WS.IPreKeys = {
-                publicKey: new Uint8Array([
-                    12,
-                    224,
-                    143,
-                    26,
-                    148,
-                    136,
-                    147,
-                    175,
-                    5,
-                    101,
-                ]),
-                signature: new Uint8Array([
-                    29,
-                    129,
-                    226,
-                    12,
-                    191,
-                    187,
-                    190,
-                    58,
-                    82,
-                    72,
-                ]),
-                index: 1,
-            };
-
-            await db("preKeys").insert(testPreKey);
+            await db("preKeys").insert(testSQLPreKey);
 
             // Act
             const provider = new Database(db);
             const result = await provider.getPreKeys(userID);
 
             // Assert
-            expect(result).toEqual(expectedPreKey);
+            expect(result).toEqual(testWSPreKey);
         });
 
         it("return null if there are no preKeys with userId param", async () => {

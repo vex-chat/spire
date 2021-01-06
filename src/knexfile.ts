@@ -3,7 +3,7 @@ import path from "path";
 
 import { Config } from "knex";
 
-const test: Config = {
+const knexTestConfig: Config = {
     client: "sqlite3",
     connection: ":memory:",
     useNullAsDefault: true,
@@ -12,11 +12,11 @@ const test: Config = {
     },
 };
 
-const development: Config = {
+const knexDevConfig: Config = {
     client: "sqlite3",
     connection: {
         filename: "./dev.sqlite3",
     },
 };
 
-export { test, development };
+export { knexTestConfig, knexDevConfig };

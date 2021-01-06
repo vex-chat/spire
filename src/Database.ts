@@ -345,7 +345,6 @@ export class Database {
                 signKey: regPayload.signKey,
                 username: regPayload.username,
                 lastSeen: new Date(Date.now()),
-                avatar: null,
             };
             await this.db("users").insert(user);
 
@@ -482,7 +481,6 @@ export class Database {
             .where({ userID: user.userID })
             .update({
                 lastSeen: new Date(Date.now()),
-                avatar: user.avatar,
             });
     }
 

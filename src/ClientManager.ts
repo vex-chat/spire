@@ -3,7 +3,6 @@ import { xConcat, XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import chalk from "chalk";
 import { EventEmitter } from "events";
-import { json } from "express";
 import msgpack from "msgpack-lite";
 import nacl from "tweetnacl";
 import {
@@ -11,7 +10,7 @@ import {
     v4 as uuidv4,
     validate as uuidValidate,
 } from "uuid";
-import winston, { Logform } from "winston";
+import winston from "winston";
 import WebSocket from "ws";
 import { Database } from "./Database";
 import { EXPIRY_TIME, ISpireOptions } from "./Spire";
