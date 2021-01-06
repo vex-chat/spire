@@ -15,6 +15,7 @@ export class Database {
     constructor(db: knex<any, unknown[]>, options?: ISpireOptions) {
         this.log = createLogger("spire-db", options?.logLevel || "error");
         this.db = db;
+        this.init();
     }
 
     public async saveOTK(
