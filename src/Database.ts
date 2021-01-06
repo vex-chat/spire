@@ -138,16 +138,29 @@ export class Database extends EventEmitter {
     public async retrieveDevice(
         deviceID: string
     ): Promise<XTypes.SQL.IDevice | null> {
-        const rows = await this.db
-            .from("devices")
-            .select()
-            .where({ deviceID });
-        if (rows.length === 0) {
-            return null;
+        if (uuid.validate(deviceID)) {
+            const rows = await this.db
+                .from("devices")
+                .select()
+                .where({ deviceID });
+            if (rows.length === 0) {
+                return null;
+            }
+            const [device] = rows;
+            return device;
         }
-        const [device] = rows;
-
-        return device;
+        if (pubkeyRegex.test(deviceID)) {
+            const rows = await this.db
+                .from("devices")
+                .select()
+                .where({ signKey: deviceID });
+            if (rows.length === 0) {
+                return null;
+            }
+            const [device] = rows;
+            return device;
+        }
+        return null;
     }
 
     public async retrieveUserDeviceList(
@@ -431,6 +444,7 @@ export class Database extends EventEmitter {
                 username: regPayload.username,
                 lastSeen: new Date(Date.now()),
                 passwordHash: passwordHash.toString("hex"),
+                passwordSalt: XUtils.encodeHex(salt),
             };
 
             await this.db("users").insert(user);
@@ -482,12 +496,6 @@ export class Database extends EventEmitter {
                 .from("users")
                 .select()
                 .where({ userID: userIdentifier })
-                .limit(1);
-        } else if (pubkeyRegex.test(userIdentifier)) {
-            rows = await this.db
-                .from("users")
-                .select()
-                .where({ signKey: userIdentifier })
                 .limit(1);
         } else {
             rows = await this.db
@@ -583,6 +591,13 @@ export class Database extends EventEmitter {
                 table.string("username").unique();
                 table.string("passwordHash");
                 table.dateTime("lastSeen");
+            });
+        }
+        if (!(await this.db.schema.hasTable("devices"))) {
+            await this.db.schema.createTable("devices", (table) => {
+                table.string("deviceID").primary();
+                table.string("owner");
+                table.string("signKey");
             });
         }
         if (!(await this.db.schema.hasTable("mail"))) {

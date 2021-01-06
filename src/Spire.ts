@@ -226,6 +226,23 @@ export class Spire extends EventEmitter {
             }
         });
 
+        this.api.get("/user/:id/devices", async (req, res) => {
+            const deviceList = await this.db.retrieveUserDeviceList(
+                req.params.id
+            );
+            return res.send(deviceList);
+        });
+
+        this.api.get("/device/:id", async (req, res) => {
+            const device = await this.db.retrieveDevice(req.params.id);
+
+            if (device) {
+                return res.send(device);
+            } else {
+                res.sendStatus(404);
+            }
+        });
+
         this.api.get("/token/:tokenType", async (req, res) => {
             const allowedTokens = ["file", "register", "avatar"];
 
@@ -376,20 +393,22 @@ export class Spire extends EventEmitter {
         this.api.post("/file", multer().single("file"), async (req, res) => {
             const payload: XTypes.HTTP.IFilePayload = req.body;
 
+            console.log(payload);
+
             if (payload.nonce === "") {
                 res.sendStatus(400);
                 return;
             }
 
-            const userEntry = await this.db.retrieveUser(payload.owner);
-            if (!userEntry) {
-                console.warn("User does not exist.");
-                res.sendStatus(500);
+            const deviceEntry = await this.db.retrieveDevice(payload.owner);
+            if (!deviceEntry) {
+                this.log.warn("No device found.");
+                res.send(400);
                 return;
             }
 
             const devices = await this.db.retrieveUserDeviceList(
-                req.params.userID
+                deviceEntry.owner
             );
 
             let token: Uint8Array | null = null;

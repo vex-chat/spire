@@ -50,6 +50,7 @@ export class ClientManager extends EventEmitter {
     private failed: boolean = false;
     private db: Database;
     private user: XTypes.SQL.IUser | null;
+    private device: XTypes.SQL.IDevice | null;
     private log: winston.Logger;
     private notify: (
         userID: string,
@@ -68,6 +69,7 @@ export class ClientManager extends EventEmitter {
         this.conn = ws;
         this.db = db;
         this.user = null;
+        this.device = null;
         this.notify = notify;
         this.log = createLogger("client-manager", options?.logLevel || "error");
 
@@ -149,6 +151,10 @@ export class ClientManager extends EventEmitter {
         }
     }
 
+    private getDevice(): XTypes.SQL.IDevice {
+        return this.device!;
+    }
+
     private ping() {
         if (!this.alive) {
             this.fail();
@@ -174,8 +180,10 @@ export class ClientManager extends EventEmitter {
                     msg.signed,
                     XUtils.decodeHex(device.signKey)
                 );
+
                 if (verified) {
                     message = verified;
+                    this.device = device;
                 }
             }
             if (!message) {
@@ -416,7 +424,7 @@ export class ClientManager extends EventEmitter {
                 if (msg.action === "RETRIEVE") {
                     try {
                         const inbox = await this.db.retrieveMail(
-                            this.getUser().userID
+                            this.getDevice().deviceID
                         );
                         for (const mail of inbox) {
                             const [mailHeader, mailBody] = mail;
@@ -444,8 +452,24 @@ export class ClientManager extends EventEmitter {
                         this.log.info(
                             "Received mail for " + msg.data.recipient
                         );
+
+                        const deviceDetails = await this.db.retrieveDevice(
+                            msg.data.recipient
+                        );
+                        if (!deviceDetails) {
+                            this.sendErr(
+                                msg.transmissionID,
+                                "No associated user record found for device."
+                            );
+                            return;
+                        }
+
                         this.sendSuccess(msg.transmissionID, null);
-                        this.notify(mail.recipient, "mail", msg.transmissionID);
+                        this.notify(
+                            deviceDetails.owner,
+                            "mail",
+                            msg.transmissionID
+                        );
                     } catch (err) {
                         this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
@@ -590,7 +614,7 @@ export class ClientManager extends EventEmitter {
     }
 
     private async handleReceipt(msg: XTypes.WS.IReceiptMsg) {
-        await this.db.deleteMail(msg.nonce, this.getUser().userID);
+        await this.db.deleteMail(msg.nonce, this.getDevice().deviceID);
     }
 
     private initListeners() {

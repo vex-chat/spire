@@ -6,3 +6,4 @@ dist
 files
 *.tgz
 avatars
+*.sqlite
