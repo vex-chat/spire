@@ -1,6 +1,6 @@
 {
     "name": "@vex-chat/spire",
-    "version": "0.2.25",
+    "version": "0.2.26",
     "description": "Vex server implementation in NodeJS.",
     "main": "./dist/index.js",
     "author": "Extra <extrahash@protonmail.com>",
