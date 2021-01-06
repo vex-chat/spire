@@ -7,12 +7,13 @@ import { config } from "dotenv";
 export function loadEnv(): void {
     config();
     const requiredEnvVars: string[] = [
-        "SQL_HOST",
-        "SQL_USER",
-        "SQL_PASSWORD",
-        "SQL_DB_NAME",
-        "SQL_PORT",
+        // "SQL_HOST",
+        // "SQL_USER",
+        // "SQL_PASSWORD",
+        // "SQL_DB_NAME",
+        // "SQL_PORT",
         "CANARY",
+        "DB_TYPE",
     ];
     for (const required of requiredEnvVars) {
         if (process.env[required] === undefined) {

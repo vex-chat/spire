@@ -1,4 +1,4 @@
-import { XUtils } from "@vex-chat/crypto";
+import { xMakeNonce, XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import { EventEmitter } from "events";
 import knex from "knex";
@@ -6,8 +6,10 @@ import * as uuid from "uuid";
 import winston from "winston";
 import { ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
+import pbkdf2 from "pbkdf2";
 
 const pubkeyRegex = /[0-9a-f]{64}/;
+const ITERATIONS = 1000;
 
 export class Database extends EventEmitter {
     private db: knex<any, unknown[]>;
@@ -61,6 +63,7 @@ export class Database extends EventEmitter {
         const newOTK: XTypes.SQL.IPreKeys = {
             keyID: uuid.v4(),
             userID,
+            deviceID: otk.deviceID,
             publicKey: XUtils.encodeHex(otk.publicKey),
             signature: XUtils.encodeHex(otk.signature),
             index: otk.index!,
@@ -69,13 +72,13 @@ export class Database extends EventEmitter {
     }
 
     public async getPreKeys(
-        userID: string
+        deviceID: string
     ): Promise<XTypes.WS.IPreKeys | null> {
         const rows: XTypes.SQL.IPreKeys[] = await this.db
             .from("preKeys")
             .select()
             .where({
-                userID,
+                deviceID,
             });
         if (rows.length === 0) {
             return null;
@@ -85,6 +88,7 @@ export class Database extends EventEmitter {
             index: preKeyInfo.index,
             publicKey: XUtils.decodeHex(preKeyInfo.publicKey),
             signature: XUtils.decodeHex(preKeyInfo.signature),
+            deviceID: preKeyInfo.deviceID,
         };
         return preKey;
     }
@@ -94,31 +98,71 @@ export class Database extends EventEmitter {
     }
 
     public async getKeyBundle(
-        userID: string
+        deviceID: string
     ): Promise<XTypes.WS.IKeyBundle | null> {
-        const user = await this.retrieveUser(userID);
-        if (!user) {
-            this.log.warn("User not found.");
+        const device = await this.retrieveDevice(deviceID);
+        if (!device) {
+            this.log.warn("Device not found.");
             return null;
         }
-        const otk = (await this.getOTK(userID)) || undefined;
-        const preKey = await this.getPreKeys(userID);
+        const otk = (await this.getOTK(deviceID)) || undefined;
+        const preKey = await this.getPreKeys(deviceID);
         if (!preKey) {
             this.log.warn("Failed to get prekey.");
             return null;
         }
         const keyBundle: XTypes.WS.IKeyBundle = {
-            signKey: XUtils.decodeHex(user.signKey),
+            signKey: XUtils.decodeHex(device.signKey),
             preKey,
             otk,
         };
         return keyBundle;
     }
 
-    public async getOTK(userID: string): Promise<XTypes.WS.IPreKeys | null> {
+    public async createDevice(
+        owner: string,
+        signKey: string
+    ): Promise<XTypes.SQL.IDevice> {
+        const device = { owner, signKey, deviceID: uuid.v4() };
+        await this.db("devices").insert(device);
+        return device;
+    }
+
+    public async deleteDevice(deviceID: string): Promise<void> {
+        return this.db
+            .from("devices")
+            .where({ deviceID })
+            .del();
+    }
+
+    public async retrieveDevice(
+        deviceID: string
+    ): Promise<XTypes.SQL.IDevice | null> {
+        const rows = await this.db
+            .from("devices")
+            .select()
+            .where({ deviceID });
+        if (rows.length === 0) {
+            return null;
+        }
+        const [device] = rows;
+
+        return device;
+    }
+
+    public async retrieveUserDeviceList(
+        userID: string
+    ): Promise<XTypes.SQL.IDevice[]> {
+        return this.db
+            .from("devices")
+            .select()
+            .where({ owner: userID });
+    }
+
+    public async getOTK(deviceID: string): Promise<XTypes.WS.IPreKeys | null> {
         const rows: XTypes.SQL.IPreKeys[] = await this.db("oneTimeKeys")
             .select()
-            .where({ userID })
+            .where({ deviceID })
             .limit(1)
             .orderBy("index");
         if (rows.length === 0) {
@@ -129,13 +173,14 @@ export class Database extends EventEmitter {
             publicKey: XUtils.decodeHex(otkInfo.publicKey),
             signature: XUtils.decodeHex(otkInfo.signature),
             index: otkInfo.index,
+            deviceID: otkInfo.deviceID,
         };
 
         // delete the otk
         await this.db
             .from("oneTimeKeys")
             .delete()
-            .where({ userID, index: otk.index });
+            .where({ deviceID, index: otk.index });
 
         return otk;
     }
@@ -372,17 +417,32 @@ export class Database extends EventEmitter {
         regPayload: XTypes.HTTP.IRegPayload
     ): Promise<[XTypes.SQL.IUser | null, Error | null]> {
         try {
+            const salt = xMakeNonce();
+            const passwordHash = pbkdf2.pbkdf2Sync(
+                regPayload.password,
+                salt,
+                ITERATIONS,
+                32,
+                "sha512"
+            );
+
             const user: XTypes.SQL.IUser = {
                 userID: uuid.stringify(regKey),
-                signKey: regPayload.signKey,
                 username: regPayload.username,
                 lastSeen: new Date(Date.now()),
+                passwordHash: passwordHash.toString("hex"),
             };
+
             await this.db("users").insert(user);
+            const device = await this.createDevice(
+                user.userID,
+                regPayload.signKey
+            );
 
             const medPreKeys: XTypes.SQL.IPreKeys = {
                 keyID: uuid.v4(),
                 userID: user.userID,
+                deviceID: device.deviceID,
                 publicKey: regPayload.preKey,
                 signature: regPayload.preKeySignature,
                 index: regPayload.preKeyIndex,
@@ -416,37 +476,32 @@ export class Database extends EventEmitter {
     public async retrieveUser(
         userIdentifier: string
     ): Promise<XTypes.SQL.IUser | null> {
+        let rows: XTypes.SQL.IUser[] = [];
         if (uuid.validate(userIdentifier)) {
-            const user = await this.db
+            rows = await this.db
                 .from("users")
                 .select()
                 .where({ userID: userIdentifier })
                 .limit(1);
-            if (!user) {
-                return null;
-            }
-            return user[0];
         } else if (pubkeyRegex.test(userIdentifier)) {
-            const user = await this.db
+            rows = await this.db
                 .from("users")
                 .select()
                 .where({ signKey: userIdentifier })
                 .limit(1);
-            if (!user) {
-                return null;
-            }
-            return user[0];
         } else {
-            const user = await this.db
+            rows = await this.db
                 .from("users")
                 .select()
                 .where({ username: userIdentifier })
                 .limit(1);
-            if (!user) {
-                return null;
-            }
-            return user[0];
         }
+
+        if (rows.length === 0) {
+            return null;
+        }
+        const [user] = rows;
+        return user;
     }
 
     public async saveMail(
@@ -525,8 +580,8 @@ export class Database extends EventEmitter {
         if (!(await this.db.schema.hasTable("users"))) {
             await this.db.schema.createTable("users", (table) => {
                 table.string("userID").primary();
-                table.string("signKey").unique();
                 table.string("username").unique();
+                table.string("passwordHash");
                 table.dateTime("lastSeen");
             });
         }
@@ -548,6 +603,7 @@ export class Database extends EventEmitter {
             await this.db.schema.createTable("preKeys", (table) => {
                 table.string("keyID").primary();
                 table.string("userID").index();
+                table.string("deviceID").index();
                 table.string("publicKey");
                 table.string("signature");
                 table.integer("index");
@@ -557,6 +613,7 @@ export class Database extends EventEmitter {
             await this.db.schema.createTable("oneTimeKeys", (table) => {
                 table.string("keyID").primary();
                 table.string("userID").index();
+                table.string("deviceID").index();
                 table.string("publicKey");
                 table.string("signature");
                 table.integer("index");

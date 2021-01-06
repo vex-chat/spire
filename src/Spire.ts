@@ -330,10 +330,20 @@ export class Spire extends EventEmitter {
                     return;
                 }
 
-                const token = nacl.sign.open(
-                    XUtils.decodeHex(payload.signed),
-                    XUtils.decodeHex(userEntry.signKey)
+                const devices = await this.db.retrieveUserDeviceList(
+                    req.params.userID
                 );
+
+                let token: Uint8Array | null = null;
+                for (const device of devices) {
+                    const verified = nacl.sign.open(
+                        XUtils.decodeHex(payload.signed),
+                        XUtils.decodeHex(device.signKey)
+                    );
+                    if (verified) {
+                        token = verified;
+                    }
+                }
                 if (!token) {
                     console.warn("Bad signature on token.");
                     res.sendStatus(401);
@@ -378,10 +388,20 @@ export class Spire extends EventEmitter {
                 return;
             }
 
-            const token = nacl.sign.open(
-                XUtils.decodeHex(payload.signed),
-                XUtils.decodeHex(userEntry.signKey)
+            const devices = await this.db.retrieveUserDeviceList(
+                req.params.userID
             );
+
+            let token: Uint8Array | null = null;
+            for (const device of devices) {
+                const verified = nacl.sign.open(
+                    XUtils.decodeHex(payload.signed),
+                    XUtils.decodeHex(device.signKey)
+                );
+                if (verified) {
+                    token = verified;
+                }
+            }
             if (!token) {
                 console.warn("Bad signature on token.");
                 res.sendStatus(401);
@@ -475,7 +495,7 @@ export class Spire extends EventEmitter {
                                     });
                                     return;
                                 }
-                                res.status(400).send({
+                                res.status(500).send({
                                     error: "An error occurred registering.",
                                 });
                                 break;
@@ -494,7 +514,7 @@ export class Spire extends EventEmitter {
                     }
                 } else {
                     res.status(400).send({
-                        error: "Invalid or no regkey supplied.",
+                        error: "Invalid or no token supplied.",
                     });
                 }
             } catch (err) {

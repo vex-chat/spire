@@ -167,10 +167,23 @@ export class ClientManager extends EventEmitter {
     private async verifyResponse(msg: XTypes.WS.IRespMsg) {
         const user = await this.db.retrieveUser(msg.userID);
         if (user) {
-            const message = nacl.sign.open(
-                msg.signed,
-                XUtils.decodeHex(user.signKey)
-            );
+            const devices = await this.db.retrieveUserDeviceList(user.userID);
+            let message: Uint8Array | null = null;
+            for (const device of devices) {
+                const verified = nacl.sign.open(
+                    msg.signed,
+                    XUtils.decodeHex(device.signKey)
+                );
+                if (verified) {
+                    message = verified;
+                }
+            }
+            if (!message) {
+                console.warn("Bad response from client.");
+                this.fail();
+                return;
+            }
+
             if (message) {
                 if (XUtils.bytesEqual(this.challengeID, message)) {
                     this.user = user;

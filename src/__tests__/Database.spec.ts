@@ -14,6 +14,7 @@ describe("Database", () => {
     // Reusable test data
     const keyID = "de459e05-aa63-4dfa-97b4-ed43d5c7a5f7";
     const userID = "4e67b90f-cbf8-44bc-8ce3-d3b248f033f1";
+    const deviceID = "23cb0b27-7d0c-43b2-87e1-c2b93e0095e5";
 
     const publicKey = XUtils.decodeHex(
         "30c2d0294c1cfdbb73c6b3bbe6010088c2dba8384b04ff2e2b92172431d66b5e"
@@ -25,6 +26,7 @@ describe("Database", () => {
     const testSQLPreKey: XTypes.SQL.IPreKeys = {
         userID,
         keyID,
+        deviceID,
         publicKey:
             "30c2d0294c1cfdbb73c6b3bbe6010088c2dba8384b04ff2e2b92172431d66b5e",
         signature:
@@ -35,6 +37,7 @@ describe("Database", () => {
     const testWSPreKey: XTypes.WS.IPreKeys = {
         publicKey,
         signature,
+        deviceID,
         index: 1,
     };
 
@@ -59,10 +62,11 @@ describe("Database", () => {
                     publicKey,
                     signature,
                     index: 1,
+                    deviceID,
                 });
 
                 // Assert
-                const oneTimeKey = await provider.getOTK(userID);
+                const oneTimeKey = await provider.getOTK(deviceID);
                 expect(oneTimeKey).toEqual(testWSPreKey);
                 done();
             });
@@ -70,7 +74,7 @@ describe("Database", () => {
     });
 
     describe("getPreKeys", () => {
-        it("returns a preKey by userId if said preKey exists.", async (done) => {
+        it("returns a preKey by deviceID if said preKey exists.", async (done) => {
             // Arrange
             expect.assertions(1); // in case there are async issues the test will fail in ci
 
@@ -79,7 +83,7 @@ describe("Database", () => {
 
             provider.on("ready", async () => {
                 await provider["db"]("preKeys").insert(testSQLPreKey);
-                const result = await provider.getPreKeys(userID);
+                const result = await provider.getPreKeys(deviceID);
 
                 // Assert
                 expect(result).toEqual(testWSPreKey);
@@ -87,13 +91,13 @@ describe("Database", () => {
             });
         });
 
-        it("return null if there are no preKeys with userId param", async (done) => {
+        it("return null if there are no preKeys with deviceID param", async (done) => {
             // Arrange
             expect.assertions(1); // in case there are async issues the test will fail in ci
             // Act
             const provider = new Database(options);
             provider.on("ready", async () => {
-                const result = await provider.getPreKeys(userID);
+                const result = await provider.getPreKeys(deviceID);
 
                 // Assert
                 expect(result).toBeNull();
