@@ -2,14 +2,14 @@ import { xMakeNonce, XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import { EventEmitter } from "events";
 import knex from "knex";
+import pbkdf2 from "pbkdf2";
 import * as uuid from "uuid";
 import winston from "winston";
 import { ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
-import pbkdf2 from "pbkdf2";
 
 const pubkeyRegex = /[0-9a-f]{64}/;
-const ITERATIONS = 1000;
+export const ITERATIONS = 1000;
 
 export class Database extends EventEmitter {
     private db: knex<any, unknown[]>;
@@ -431,13 +431,7 @@ export class Database extends EventEmitter {
     ): Promise<[XTypes.SQL.IUser | null, Error | null]> {
         try {
             const salt = xMakeNonce();
-            const passwordHash = pbkdf2.pbkdf2Sync(
-                regPayload.password,
-                salt,
-                ITERATIONS,
-                32,
-                "sha512"
-            );
+            const passwordHash = hashPassword(regPayload.password, salt);
 
             const user: XTypes.SQL.IUser = {
                 userID: uuid.stringify(regKey),
@@ -670,3 +664,6 @@ export class Database extends EventEmitter {
         this.emit("ready");
     }
 }
+
+export const hashPassword = (password: string, salt: Uint8Array) =>
+    pbkdf2.pbkdf2Sync(password, salt, ITERATIONS, 32, "sha512");

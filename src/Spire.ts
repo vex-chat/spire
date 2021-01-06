@@ -12,12 +12,13 @@ import knex from "knex";
 import morgan from "morgan";
 import multer from "multer";
 import path from "path";
+import pbkdf2 from "pbkdf2";
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
 import winston from "winston";
 import WebSocket from "ws";
 import { ClientManager } from "./ClientManager";
-import { Database } from "./Database";
+import { Database, hashPassword, ITERATIONS } from "./Database";
 import { createLogger } from "./utils/createLogger";
 
 // expiry of regkeys
@@ -231,6 +232,77 @@ export class Spire extends EventEmitter {
                 req.params.id
             );
             return res.send(deviceList);
+        });
+
+        this.api.delete("/user/:userID/devices/:deviceID", async (req, res) => {
+            const { userID, deviceID } = req.params;
+            const { password } = req.body;
+
+            const userEntry = await this.db.retrieveUser(userID);
+            if (!userEntry) {
+                this.log.warn("This user doesn't exist.");
+                res.sendStatus(404);
+                return;
+            }
+
+            const deviceEntry = await this.db.retrieveDevice(deviceID);
+            if (!deviceEntry) {
+                this.log.warn("This device doesn't exist.");
+                res.sendStatus(404);
+            }
+
+            const salt = XUtils.decodeHex(userEntry.passwordHash);
+            const payloadHash = XUtils.encodeHex(hashPassword(password, salt));
+            if (payloadHash !== userEntry.passwordHash) {
+                res.sendStatus(401);
+                this.log.info("Wrong password.");
+            } else {
+                this.db.deleteDevice(deviceID);
+                res.sendStatus(200);
+            }
+        });
+
+        this.api.post("/user/:id/devices", async (req, res) => {
+            const devicePayload: XTypes.HTTP.IRegPayload = req.body;
+
+            const userEntry = await this.db.retrieveUser(req.params.id);
+            if (!userEntry) {
+                res.sendStatus(404);
+                this.log.warn("User does not exist.");
+                return;
+            }
+            const salt = XUtils.decodeHex(userEntry.passwordSalt);
+            const payloadHash = XUtils.encodeHex(
+                hashPassword(devicePayload.password, salt)
+            );
+
+            if (payloadHash !== userEntry.passwordHash) {
+                res.sendStatus(401);
+                return;
+            }
+
+            const token = nacl.sign.open(
+                XUtils.decodeHex(devicePayload.signed),
+                XUtils.decodeHex(devicePayload.signKey)
+            );
+
+            if (!token) {
+                this.log.warn("Invalid signature on token.");
+                res.sendStatus(400);
+                return;
+            }
+
+            if (
+                this.validateToken(XUtils.encodeHex(token), TokenScopes.Device)
+            ) {
+                await this.db.createDevice(
+                    userEntry.userID,
+                    devicePayload.signKey
+                );
+                res.sendStatus(200);
+            } else {
+                res.sendStatus(401);
+            }
         });
 
         this.api.get("/device/:id", async (req, res) => {
