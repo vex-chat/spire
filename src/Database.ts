@@ -518,13 +518,13 @@ export class Database extends EventEmitter {
     public async saveMail(
         mail: XTypes.WS.IMail,
         header: Uint8Array,
-        senderID: string
+        deviceID: string
     ): Promise<void> {
         const entry: XTypes.SQL.IMail = {
             mailID: mail.mailID,
             mailType: mail.mailType,
             recipient: mail.recipient,
-            sender: senderID,
+            sender: deviceID,
             cipher: XUtils.encodeHex(mail.cipher),
             nonce: XUtils.encodeHex(mail.nonce),
             extra: XUtils.encodeHex(mail.extra),
