@@ -63,6 +63,8 @@ export class Spire extends EventEmitter {
     private server: Server | null = null;
     private options: ISpireOptions | undefined;
 
+    private bundleQueue: string[] = [];
+
     constructor(options?: ISpireOptions) {
         super();
 
@@ -172,6 +174,7 @@ export class Spire extends EventEmitter {
             const client = new ClientManager(
                 ws,
                 this.db,
+                this.bundleQueue,
                 this.notify.bind(this),
                 this.options
             );

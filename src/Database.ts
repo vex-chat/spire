@@ -1,3 +1,4 @@
+import { sleep } from "@extrahash/sleep";
 import { xMakeNonce, XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import { EventEmitter } from "events";
@@ -14,6 +15,7 @@ export const ITERATIONS = 1000;
 export class Database extends EventEmitter {
     private db: knex<any, unknown[]>;
     private log: winston.Logger;
+    private otkQueue: string[] = [];
 
     constructor(options?: ISpireOptions) {
         super();
@@ -193,6 +195,10 @@ export class Database extends EventEmitter {
     }
 
     public async getOTK(deviceID: string): Promise<XTypes.WS.IPreKeys | null> {
+        while (this.otkQueue.includes(deviceID)) {
+            await sleep(100);
+        }
+        this.otkQueue.push(deviceID);
         const rows: XTypes.SQL.IPreKeys[] = await this.db("oneTimeKeys")
             .select()
             .where({ deviceID })
@@ -209,13 +215,18 @@ export class Database extends EventEmitter {
             deviceID: otkInfo.deviceID,
         };
 
-        // delete the otk
-        await this.db
-            .from("oneTimeKeys")
-            .delete()
-            .where({ deviceID, index: otk.index });
-
-        return otk;
+        try {
+            // delete the otk
+            await this.db
+                .from("oneTimeKeys")
+                .delete()
+                .where({ deviceID, index: otk.index });
+            this.otkQueue.splice(this.otkQueue.indexOf(deviceID));
+            return otk;
+        } catch (err) {
+            this.otkQueue.splice(this.otkQueue.indexOf(deviceID));
+            throw err;
+        }
     }
 
     public async getOTKCount(deviceID: string): Promise<number> {
