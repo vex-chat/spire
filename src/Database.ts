@@ -537,13 +537,13 @@ export class Database extends EventEmitter {
     }
 
     public async retrieveMail(
-        userID: string
+        deviceID: string
         // tslint:disable-next-line: array-type
     ): Promise<[Uint8Array, XTypes.WS.IMail][]> {
         const rows: XTypes.SQL.IMail[] = await this.db
             .from("mail")
             .select()
-            .where({ recipient: userID });
+            .where({ recipient: deviceID });
 
         const mapFunc: (
             row: XTypes.SQL.IMail
