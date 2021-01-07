@@ -124,7 +124,15 @@ export class Database extends EventEmitter {
         payload: XTypes.HTTP.IRegPayload
     ): Promise<XTypes.SQL.IDevice> {
         const device = { owner, signKey: payload.signKey, deviceID: uuid.v4() };
-        await this.db("devices").insert(device);
+
+        try {
+            await this.db("devices").insert(device);
+        } catch (err) {
+            if (err.errno !== 19) {
+                throw err;
+            }
+            this.log.warn("Attempted to insert duplicate deviceID.");
+        }
 
         const medPreKeys: XTypes.SQL.IPreKeys = {
             keyID: uuid.v4(),
