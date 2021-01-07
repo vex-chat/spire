@@ -1,6 +1,6 @@
 {
     "name": "@vex-chat/spire",
-    "version": "0.4.3",
+    "version": "0.4.4",
     "description": "Vex server implementation in NodeJS.",
     "main": "./dist/index.js",
     "author": "Extra <extrahash@protonmail.com>",
@@ -50,7 +50,7 @@
         "@types/uuid": "^8.3.0",
         "@types/ws": "^7.4.0",
         "@vex-chat/crypto": "^0.7.15",
-        "@vex-chat/types": "^0.9.4",
+        "@vex-chat/types": "^0.9.7",
         "chalk": "^4.1.0",
         "cors": "^2.8.5",
         "dotenv": "^8.2.0",

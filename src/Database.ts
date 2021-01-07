@@ -539,6 +539,7 @@ export class Database extends EventEmitter {
             header: XUtils.encodeHex(header),
             time: new Date(Date.now()),
             group: mail.group ? XUtils.encodeHex(mail.group) : null,
+            forward: mail.forward,
         };
 
         await this.db("mail").insert(entry);
@@ -565,6 +566,7 @@ export class Database extends EventEmitter {
                 extra: XUtils.decodeHex(row.extra),
                 sender: row.sender,
                 group: row.group ? XUtils.decodeHex(row.group) : null,
+                forward: Boolean(row.forward),
             };
             const msgh = XUtils.decodeHex(row.header);
             return [msgh, msgb];
@@ -624,6 +626,7 @@ export class Database extends EventEmitter {
                 table.text("extra");
                 table.integer("mailType");
                 table.dateTime("time");
+                table.boolean("forward");
             });
         }
         if (!(await this.db.schema.hasTable("preKeys"))) {
