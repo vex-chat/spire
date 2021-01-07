@@ -837,17 +837,17 @@
     ts-jest "^26.4.4"
     tweetnacl "^1.0.3"
 
-"@vex-chat/types@0.8.9":
-  version "0.8.9"
-  resolved "https://registry.yarnpkg.com/@vex-chat/types/-/types-0.8.9.tgz#9ece2a54f061a2a53be3ba4fbe86ba82113ab114"
-  integrity sha512-5GAALHAN6VAT3cvOvxoikhQ6K5GzBfjpdFcSB11IQB3rmAcHcW/GisP/W+zcDaAwZzN5PMqyyDcPQHPruC7q5w==
-  dependencies:
-    tweetnacl "^1.0.3"
-
 "@vex-chat/types@^0.7.21":
   version "0.7.21"
   resolved "https://registry.yarnpkg.com/@vex-chat/types/-/types-0.7.21.tgz#64631ba2ac7edd5dc0ce9d32d15f76f164715a43"
   integrity sha512-5JceTul3ei+j9t+QcLe1arKyuMDfMNwpJz1LaZ6ncWvKi6DeBrI3lHrzVZSN6uCXCrI1apB7rqCl8WxyXCkHNA==
+  dependencies:
+    tweetnacl "^1.0.3"
+
+"@vex-chat/types@^0.9.4":
+  version "0.9.4"
+  resolved "https://registry.yarnpkg.com/@vex-chat/types/-/types-0.9.4.tgz#4cdc838becd61891cf97ad68d192a938d5998c2e"
+  integrity sha512-YdVVW2IZdgKh5YI9x94CH4OkaXA+IVzWIAfOdibz1Zu27Dp6ns5bTZMLbLxNDt9arM1J0fpVhqLno8BJi7MpKg==
   dependencies:
     tweetnacl "^1.0.3"
 
