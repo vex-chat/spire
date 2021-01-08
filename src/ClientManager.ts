@@ -13,7 +13,7 @@ import {
 import winston from "winston";
 import WebSocket from "ws";
 import { Database } from "./Database";
-import { EXPIRY_TIME, ISpireOptions } from "./Spire";
+import { censorUser, EXPIRY_TIME, ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
 
@@ -316,7 +316,7 @@ export class ClientManager extends EventEmitter {
                 if (msg.action === "RETRIEVE") {
                     try {
                         const keyCount = await this.db.getOTKCount(
-                            this.getUser().userID
+                            this.getDevice().deviceID
                         );
                         this.sendSuccess(msg.transmissionID, keyCount);
                     } catch (err) {
@@ -327,7 +327,7 @@ export class ClientManager extends EventEmitter {
                 if (msg.action === "CREATE") {
                     try {
                         await this.db.saveOTK(
-                            this.getUser().userID,
+                            this.getDevice().deviceID,
                             msg.data as XTypes.WS.IPreKeys
                         );
                         this.sendSuccess(msg.transmissionID, msg);
@@ -342,7 +342,10 @@ export class ClientManager extends EventEmitter {
                     try {
                         const user = await this.db.retrieveUser(msg.data);
                         if (user) {
-                            this.sendSuccess(msg.transmissionID, user);
+                            this.sendSuccess(
+                                msg.transmissionID,
+                                censorUser(user)
+                            );
                         } else {
                             this.log.error("User doesn't exist.");
                             this.sendErr(
@@ -350,18 +353,6 @@ export class ClientManager extends EventEmitter {
                                 "That user doesn't exist."
                             );
                         }
-                    } catch (err) {
-                        this.log.error(err);
-                        this.sendErr(msg.transmissionID, err.toString());
-                    }
-                }
-                break;
-            // this is the global userlist
-            case "users":
-                if (msg.action === "RETRIEVE") {
-                    try {
-                        const users = await this.db.retrieveUsers();
-                        this.sendSuccess(msg.transmissionID, users);
                     } catch (err) {
                         this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
@@ -395,7 +386,7 @@ export class ClientManager extends EventEmitter {
                                 );
                                 this.sendSuccess(
                                     msg.transmissionID,
-                                    groupMembers
+                                    groupMembers.map((user) => censorUser(user))
                                 );
                                 break;
                             }

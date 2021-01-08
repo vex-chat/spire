@@ -224,7 +224,7 @@ export class Spire extends EventEmitter {
             const user = await this.db.retrieveUser(req.params.id);
 
             if (user) {
-                return res.send(user);
+                return res.send(censorUser(user));
             } else {
                 res.sendStatus(404);
             }
@@ -600,7 +600,7 @@ export class Spire extends EventEmitter {
                         }
                     } else {
                         this.log.info("Registration success.");
-                        res.send(user);
+                        res.send(censorUser(user!));
                     }
                 } else {
                     res.status(400).send({
@@ -625,3 +625,17 @@ export class Spire extends EventEmitter {
 const jestRun = () => {
     return process.env.JEST_WORKER_ID !== undefined;
 };
+
+export const censorUser = (user: XTypes.SQL.IUser): ICensoredUser => {
+    return {
+        userID: user.userID,
+        username: user.username,
+        lastSeen: user.lastSeen,
+    };
+};
+
+interface ICensoredUser {
+    userID: string;
+    username: string;
+    lastSeen: Date;
+}
