@@ -113,7 +113,12 @@ export class ClientManager extends EventEmitter {
         );
 
         this.log.debug(chalk.red.bold("OUT"), msg);
-        this.conn.send(packedMessage);
+        try {
+            this.conn.send(packedMessage);
+        } catch (err) {
+            this.log.warn(err.toString());
+            this.fail();
+        }
     }
 
     private authorize(transmissionID: string) {
