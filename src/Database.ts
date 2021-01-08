@@ -535,7 +535,8 @@ export class Database extends EventEmitter {
     public async saveMail(
         mail: XTypes.WS.IMail,
         header: Uint8Array,
-        deviceID: string
+        deviceID: string,
+        userID: string
     ): Promise<void> {
         const entry: XTypes.SQL.IMail = {
             mailID: mail.mailID,
@@ -549,7 +550,7 @@ export class Database extends EventEmitter {
             time: new Date(Date.now()),
             group: mail.group ? XUtils.encodeHex(mail.group) : null,
             forward: mail.forward,
-            authorID: mail.authorID,
+            authorID: userID,
             readerID: mail.readerID,
         };
 

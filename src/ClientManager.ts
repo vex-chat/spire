@@ -450,7 +450,8 @@ export class ClientManager extends EventEmitter {
                         await this.db.saveMail(
                             mail,
                             header,
-                            this.getDevice().deviceID
+                            this.getDevice().deviceID,
+                            this.getUser().userID
                         );
                         this.log.info(
                             "Received mail for " + msg.data.recipient
