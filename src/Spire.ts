@@ -396,7 +396,7 @@ export class Spire extends EventEmitter {
                     if (err) {
                         this.log.error("error reading file");
                         this.log.error(err);
-                        res.sendStatus(500);
+                        res.sendStatus(404);
                     } else {
                         const typeDetails = await FileType.fromBuffer(file);
                         if (typeDetails) {
