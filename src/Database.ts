@@ -551,6 +551,7 @@ export class Database extends EventEmitter {
             time: new Date(Date.now()),
             group: mail.group ? XUtils.encodeHex(mail.group) : null,
             forward: mail.forward,
+            authorID: mail.authorID,
         };
 
         await this.db("mail").insert(entry);
@@ -566,20 +567,21 @@ export class Database extends EventEmitter {
             .where({ recipient: deviceID });
 
         const mapFunc: (
-            row: XTypes.SQL.IMail
-        ) => [Uint8Array, XTypes.WS.IMail] = (row) => {
+            mail: XTypes.SQL.IMail
+        ) => [Uint8Array, XTypes.WS.IMail] = (mail) => {
             const msgb: XTypes.WS.IMail = {
-                mailType: row.mailType,
-                mailID: row.mailID,
-                recipient: row.recipient,
-                cipher: XUtils.decodeHex(row.cipher),
-                nonce: XUtils.decodeHex(row.nonce),
-                extra: XUtils.decodeHex(row.extra),
-                sender: row.sender,
-                group: row.group ? XUtils.decodeHex(row.group) : null,
-                forward: Boolean(row.forward),
+                mailType: mail.mailType,
+                mailID: mail.mailID,
+                recipient: mail.recipient,
+                cipher: XUtils.decodeHex(mail.cipher),
+                nonce: XUtils.decodeHex(mail.nonce),
+                extra: XUtils.decodeHex(mail.extra),
+                sender: mail.sender,
+                group: mail.group ? XUtils.decodeHex(mail.group) : null,
+                forward: Boolean(mail.forward),
+                authorID: mail.authorID,
             };
-            const msgh = XUtils.decodeHex(row.header);
+            const msgh = XUtils.decodeHex(mail.header);
             return [msgh, msgb];
         };
 
@@ -638,6 +640,7 @@ export class Database extends EventEmitter {
                 table.integer("mailType");
                 table.dateTime("time");
                 table.boolean("forward");
+                table.string("authorID");
             });
         }
         if (!(await this.db.schema.hasTable("preKeys"))) {
