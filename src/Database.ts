@@ -643,6 +643,7 @@ export class Database extends EventEmitter {
                 table.dateTime("time");
                 table.boolean("forward");
                 table.string("authorID");
+                table.string("readerID");
             });
         }
         if (!(await this.db.schema.hasTable("preKeys"))) {
