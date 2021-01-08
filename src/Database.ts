@@ -104,14 +104,12 @@ export class Database extends EventEmitter {
     ): Promise<XTypes.WS.IKeyBundle | null> {
         const device = await this.retrieveDevice(deviceID);
         if (!device) {
-            this.log.warn("Device not found.");
-            return null;
+            throw new Error("DeviceID not found.");
         }
         const otk = (await this.getOTK(deviceID)) || undefined;
         const preKey = await this.getPreKeys(deviceID);
         if (!preKey) {
-            this.log.warn("Failed to get prekey.");
-            return null;
+            throw new Error("Failed to get prekey.");
         }
         const keyBundle: XTypes.WS.IKeyBundle = {
             signKey: XUtils.decodeHex(device.signKey),
