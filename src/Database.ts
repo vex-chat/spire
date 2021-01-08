@@ -552,6 +552,7 @@ export class Database extends EventEmitter {
             group: mail.group ? XUtils.encodeHex(mail.group) : null,
             forward: mail.forward,
             authorID: mail.authorID,
+            readerID: mail.readerID,
         };
 
         await this.db("mail").insert(entry);
@@ -580,6 +581,7 @@ export class Database extends EventEmitter {
                 group: mail.group ? XUtils.decodeHex(mail.group) : null,
                 forward: Boolean(mail.forward),
                 authorID: mail.authorID,
+                readerID: mail.readerID,
             };
             const msgh = XUtils.decodeHex(mail.header);
             return [msgh, msgb];
