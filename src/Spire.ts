@@ -266,7 +266,7 @@ export class Spire extends EventEmitter {
         });
 
         this.api.post("/user/:id/devices", async (req, res) => {
-            const devicePayload: XTypes.HTTP.IRegPayload = req.body;
+            const devicePayload: XTypes.HTTP.IDevicePayload = req.body;
 
             const userEntry = await this.db.retrieveUser(req.params.id);
             if (!userEntry) {
@@ -533,7 +533,7 @@ export class Spire extends EventEmitter {
         // 19 char max limit for username
         this.api.post("/register/new", async (req, res) => {
             try {
-                const regPayload: XTypes.HTTP.IRegPayload = req.body;
+                const regPayload: XTypes.HTTP.IDevicePayload = req.body;
 
                 if (!usernameRegex.test(regPayload.username)) {
                     res.status(400).send({

@@ -121,7 +121,7 @@ export class Database extends EventEmitter {
 
     public async createDevice(
         owner: string,
-        payload: XTypes.HTTP.IRegPayload
+        payload: XTypes.HTTP.IDevicePayload
     ): Promise<XTypes.SQL.IDevice> {
         const device = {
             owner,
@@ -462,7 +462,7 @@ export class Database extends EventEmitter {
 
     public async createUser(
         regKey: Uint8Array,
-        regPayload: XTypes.HTTP.IRegPayload
+        regPayload: XTypes.HTTP.IDevicePayload
     ): Promise<[XTypes.SQL.IUser | null, Error | null]> {
         try {
             const salt = xMakeNonce();
