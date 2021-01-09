@@ -186,7 +186,7 @@ export class ClientManager extends EventEmitter {
     private async verifyResponse(msg: XTypes.WS.IRespMsg) {
         const user = await this.db.retrieveUser(msg.userID);
         if (user) {
-            const salt = XUtils.decodeHex(user.passwordHash);
+            const salt = XUtils.decodeHex(user.passwordSalt);
             const payloadHash = XUtils.encodeHex(
                 hashPassword(msg.password, salt)
             );
