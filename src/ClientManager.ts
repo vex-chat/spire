@@ -184,6 +184,7 @@ export class ClientManager extends EventEmitter {
     }
 
     private async verifyResponse(msg: XTypes.WS.IRespMsg) {
+        console.log(msg);
         const user = await this.db.retrieveUser(msg.userID);
         if (user) {
             const salt = XUtils.decodeHex(user.passwordSalt);
@@ -191,7 +192,7 @@ export class ClientManager extends EventEmitter {
                 hashPassword(msg.password, salt)
             );
             if (payloadHash !== user.passwordHash) {
-                console.warn("Wrong password from client.");
+                await this.sendErr(msg.transmissionID, "Invalid password.");
                 this.fail();
                 return;
             }
