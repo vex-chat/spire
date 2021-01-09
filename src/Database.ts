@@ -123,7 +123,13 @@ export class Database extends EventEmitter {
         owner: string,
         payload: XTypes.HTTP.IRegPayload
     ): Promise<XTypes.SQL.IDevice> {
-        const device = { owner, signKey: payload.signKey, deviceID: uuid.v4() };
+        const device = {
+            owner,
+            signKey: payload.signKey,
+            deviceID: uuid.v4(),
+            name: payload.deviceName,
+            lastLogin: new Date(Date.now()).toString(),
+        };
 
         try {
             await this.db("devices").insert(device);
