@@ -12,7 +12,7 @@ import {
 } from "uuid";
 import winston from "winston";
 import WebSocket from "ws";
-import { Database } from "./Database";
+import { Database, hashPassword } from "./Database";
 import { censorUser, EXPIRY_TIME, ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
@@ -174,6 +174,11 @@ export class ClientManager extends EventEmitter {
     }
 
     private pong(transmissionID: string) {
+        // ping is allowed before auth
+        if (this.user) {
+            this.db.markUserSeen(this.user);
+        }
+
         const p = { transmissionID, type: "pong" };
         this.send(p);
     }
@@ -181,6 +186,16 @@ export class ClientManager extends EventEmitter {
     private async verifyResponse(msg: XTypes.WS.IRespMsg) {
         const user = await this.db.retrieveUser(msg.userID);
         if (user) {
+            const salt = XUtils.decodeHex(user.passwordHash);
+            const payloadHash = XUtils.encodeHex(
+                hashPassword(msg.password, salt)
+            );
+            if (payloadHash !== user.passwordHash) {
+                console.warn("Wrong password from client.");
+                this.fail();
+                return;
+            }
+
             const devices = await this.db.retrieveUserDeviceList(user.userID);
             let message: Uint8Array | null = null;
             for (const device of devices) {

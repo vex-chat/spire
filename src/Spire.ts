@@ -254,7 +254,7 @@ export class Spire extends EventEmitter {
                 res.sendStatus(404);
             }
 
-            const salt = XUtils.decodeHex(userEntry.passwordHash);
+            const salt = XUtils.decodeHex(userEntry.passwordSalt);
             const payloadHash = XUtils.encodeHex(hashPassword(password, salt));
             if (payloadHash !== userEntry.passwordHash) {
                 res.sendStatus(401);

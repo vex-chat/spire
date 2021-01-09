@@ -837,10 +837,10 @@
     ts-jest "^26.4.4"
     tweetnacl "^1.0.3"
 
-"@vex-chat/types@^0.10.4":
-  version "0.10.4"
-  resolved "https://registry.yarnpkg.com/@vex-chat/types/-/types-0.10.4.tgz#ddc814cf69ba3607c4ed4e98c9a8246c64b3a628"
-  integrity sha512-/7gAW7IP1feT8gQmTeVR18I0DFIH+MyV1qYPETkHaGGEgqVVShdnzetYVbAIQas0uNv5lWi0PmcDarvpHpk+sA==
+"@vex-chat/types@^0.10.5":
+  version "0.10.5"
+  resolved "https://registry.yarnpkg.com/@vex-chat/types/-/types-0.10.5.tgz#ddaaf9064e682ef6323d5fa916e3eb59658e04f8"
+  integrity sha512-V3mSUfqWo+nO/uYUJwafBtB9aaPyK+NGSfgWAOWAi3sAcp+ecC/lEcaTS6VJb5PhpuOF3kmiD587dLUo32EPKg==
   dependencies:
     tweetnacl "^1.0.3"
 

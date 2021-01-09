@@ -604,11 +604,19 @@ export class Database extends EventEmitter {
             .where({ nonce: XUtils.encodeHex(nonce), recipient: userID });
     }
 
-    public async updateUser(user: XTypes.SQL.IUser): Promise<void> {
+    public async markUserSeen(user: XTypes.SQL.IUser): Promise<void> {
         await this.db("users")
             .where({ userID: user.userID })
             .update({
                 lastSeen: new Date(Date.now()),
+            });
+    }
+
+    public async markDeviceLogin(device: XTypes.SQL.IDevice): Promise<void> {
+        await this.db("users")
+            .where({ deviceID: device.deviceID })
+            .update({
+                lastLogin: new Date(Date.now()),
             });
     }
 
@@ -632,6 +640,8 @@ export class Database extends EventEmitter {
                 table.string("deviceID").primary();
                 table.string("signKey").unique();
                 table.string("owner");
+                table.string("name");
+                table.string("lastLogin");
             });
         }
         if (!(await this.db.schema.hasTable("mail"))) {
