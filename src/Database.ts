@@ -121,9 +121,15 @@ export class Database extends EventEmitter {
 
     public async createDevice(
         owner: string,
-        payload: XTypes.HTTP.IRegPayload
+        payload: XTypes.HTTP.IDevicePayload
     ): Promise<XTypes.SQL.IDevice> {
-        const device = { owner, signKey: payload.signKey, deviceID: uuid.v4() };
+        const device = {
+            owner,
+            signKey: payload.signKey,
+            deviceID: uuid.v4(),
+            name: payload.deviceName,
+            lastLogin: new Date(Date.now()).toString(),
+        };
 
         try {
             await this.db("devices").insert(device);
@@ -456,7 +462,7 @@ export class Database extends EventEmitter {
 
     public async createUser(
         regKey: Uint8Array,
-        regPayload: XTypes.HTTP.IRegPayload
+        regPayload: XTypes.HTTP.IDevicePayload
     ): Promise<[XTypes.SQL.IUser | null, Error | null]> {
         try {
             const salt = xMakeNonce();
