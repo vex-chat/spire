@@ -12,6 +12,7 @@ import winston from "winston";
 import WebSocket from "ws";
 
 import { initApp } from "./server";
+import { censorUser } from "./server/utils";
 import { ClientManager } from "./ClientManager";
 import { Database, hashPassword } from "./Database";
 import { createLogger } from "./utils/createLogger";
@@ -374,18 +375,4 @@ export class Spire extends EventEmitter {
             this.log.info("API started on port " + apiPort.toString());
         });
     }
-}
-
-export const censorUser = (user: XTypes.SQL.IUser): ICensoredUser => {
-    return {
-        userID: user.userID,
-        username: user.username,
-        lastSeen: user.lastSeen,
-    };
-};
-
-interface ICensoredUser {
-    userID: string;
-    username: string;
-    lastSeen: Date;
 }

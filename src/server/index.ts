@@ -15,7 +15,8 @@ import nacl from "tweetnacl";
 import * as uuid from "uuid";
 import winston from "winston";
 
-import { Database, hashPassword } from "./Database";
+import { Database } from "../Database";
+import { getUserRouter } from "./user";
 
 // expiry of regkeys
 export const EXPIRY_TIME = 1000 * 60 * 5;
@@ -34,6 +35,9 @@ export const initApp = (
     db: Database,
     log: winston.Logger
 ) => {
+    // INIT ROUTERS
+    const userRouter = getUserRouter(db, log);
+
     api.use(express.json({ limit: "20mb" }));
     api.use(helmet());
 
@@ -64,78 +68,9 @@ export const initApp = (
     });
 
     // user
-    api.get("/user/:id", async (req, res) => {
-        const user = await db.retrieveUser(req.params.id);
-
-        if (user) {
-            return res.send(censorUser(user));
-        } else {
-            res.sendStatus(404);
-        }
-    });
-
-    api.get("/user/:id/devices", async (req, res) => {
-        const deviceList = await db.retrieveUserDeviceList(req.params.id);
-        return res.send(deviceList);
-    });
-
-    api.delete("/user/:userID/devices/:deviceID", async (req, res) => {
-        const { userID, deviceID } = req.params;
-        const { password } = req.body;
-
-        const userEntry = await db.retrieveUser(userID);
-        if (!userEntry) {
-            log.warn("This user doesn't exist.");
-            res.sendStatus(404);
-            return;
-        }
-
-        const deviceEntry = await db.retrieveDevice(deviceID);
-        if (!deviceEntry) {
-            log.warn("This device doesn't exist.");
-            res.sendStatus(404);
-        }
-
-        const salt = XUtils.decodeHex(userEntry.passwordSalt);
-        const payloadHash = XUtils.encodeHex(hashPassword(password, salt));
-        if (payloadHash !== userEntry.passwordHash) {
-            res.sendStatus(401);
-            log.info("Wrong password.");
-        } else {
-            db.deleteDevice(deviceID);
-            res.sendStatus(200);
-        }
-    });
-
-    api.post("/user/:id/authenticate", async (req, res) => {
-        const credentials: { username: string; password: string } = req.body;
-
-        try {
-            const userEntry = await db.retrieveUser(req.params.id);
-            if (!userEntry) {
-                res.sendStatus(404);
-                log.warn("User does not exist.");
-                return;
-            }
-
-            const salt = XUtils.decodeHex(userEntry.passwordSalt);
-            const payloadHash = XUtils.encodeHex(
-                hashPassword(credentials.password, salt)
-            );
-
-            if (payloadHash !== userEntry.passwordHash) {
-                res.sendStatus(401);
-                return;
-            }
-            // TODO: set a cookie here and use it for WS
-            res.sendStatus(200);
-        } catch (err) {
-            res.sendStatus(500);
-        }
-    });
+    api.use("/user", userRouter);
 
     // device
-
     api.get("/device/:id", async (req, res) => {
         const device = await db.retrieveDevice(req.params.id);
 
@@ -296,17 +231,3 @@ export const initApp = (
 const jestRun = () => {
     return process.env.JEST_WORKER_ID !== undefined;
 };
-
-export const censorUser = (user: XTypes.SQL.IUser): ICensoredUser => {
-    return {
-        userID: user.userID,
-        username: user.username,
-        lastSeen: user.lastSeen,
-    };
-};
-
-interface ICensoredUser {
-    userID: string;
-    username: string;
-    lastSeen: Date;
-}

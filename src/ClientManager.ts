@@ -12,8 +12,10 @@ import {
 } from "uuid";
 import winston from "winston";
 import WebSocket from "ws";
+
 import { Database, hashPassword } from "./Database";
-import { censorUser, EXPIRY_TIME, ISpireOptions } from "./Spire";
+import { censorUser } from "./server/utils";
+import { EXPIRY_TIME, ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
 
