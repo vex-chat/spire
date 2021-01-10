@@ -1,24 +1,19 @@
+import fs from "fs";
+import { Server } from "http";
+
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
-import cors from "cors";
 import { EventEmitter } from "events";
 import express from "express";
 import expressWs from "express-ws";
-import FileType from "file-type";
-import fs from "fs";
-import helmet from "helmet";
-import { Server } from "http";
-import knex from "knex";
-import morgan from "morgan";
-import multer from "multer";
-import path from "path";
-import pbkdf2 from "pbkdf2";
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
 import winston from "winston";
 import WebSocket from "ws";
+
+import { initApp } from "./server";
 import { ClientManager } from "./ClientManager";
-import { Database, hashPassword, ITERATIONS } from "./Database";
+import { Database, hashPassword } from "./Database";
 import { createLogger } from "./utils/createLogger";
 
 // expiry of regkeys
@@ -158,15 +153,10 @@ export class Spire extends EventEmitter {
     }
 
     private init(apiPort: number): void {
-        this.api.use(express.json({ limit: "20mb" }));
-        this.api.use(helmet());
+        // initialize the expression app configuration with loose routes/handlers
+        initApp(this.api, this.db, this.log);
 
-        if (!jestRun()) {
-            this.api.use(morgan("dev", { stream: process.stdout }));
-        }
-
-        this.api.use(cors());
-
+        // All the app logic strongly coupled to spire class :/
         this.api.ws("/socket", (ws, req) => {
             this.log.info("New client initiated.");
             const client = new ClientManager(
@@ -195,99 +185,6 @@ export class Spire extends EventEmitter {
                     "Current authorized clients: " + this.clients.length
                 );
             });
-        });
-
-        this.api.get("/server/:id", async (req, res) => {
-            const server = await this.db.retrieveServer(req.params.id);
-
-            if (server) {
-                return res.send(server);
-            } else {
-                res.sendStatus(404);
-            }
-        });
-
-        this.api.get("/channel/:id", async (req, res) => {
-            const channel = await this.db.retrieveChannel(req.params.id);
-
-            if (channel) {
-                return res.send(channel);
-            } else {
-                res.sendStatus(404);
-            }
-        });
-
-        this.api.get("/user/:id", async (req, res) => {
-            const user = await this.db.retrieveUser(req.params.id);
-
-            if (user) {
-                return res.send(censorUser(user));
-            } else {
-                res.sendStatus(404);
-            }
-        });
-
-        this.api.get("/user/:id/devices", async (req, res) => {
-            const deviceList = await this.db.retrieveUserDeviceList(
-                req.params.id
-            );
-            return res.send(deviceList);
-        });
-
-        this.api.delete("/user/:userID/devices/:deviceID", async (req, res) => {
-            const { userID, deviceID } = req.params;
-            const { password } = req.body;
-
-            const userEntry = await this.db.retrieveUser(userID);
-            if (!userEntry) {
-                this.log.warn("This user doesn't exist.");
-                res.sendStatus(404);
-                return;
-            }
-
-            const deviceEntry = await this.db.retrieveDevice(deviceID);
-            if (!deviceEntry) {
-                this.log.warn("This device doesn't exist.");
-                res.sendStatus(404);
-            }
-
-            const salt = XUtils.decodeHex(userEntry.passwordSalt);
-            const payloadHash = XUtils.encodeHex(hashPassword(password, salt));
-            if (payloadHash !== userEntry.passwordHash) {
-                res.sendStatus(401);
-                this.log.info("Wrong password.");
-            } else {
-                this.db.deleteDevice(deviceID);
-                res.sendStatus(200);
-            }
-        });
-
-        this.api.post("/user/:id/authenticate", async (req, res) => {
-            const credentials: { username: string; password: string } =
-                req.body;
-
-            try {
-                const userEntry = await this.db.retrieveUser(req.params.id);
-                if (!userEntry) {
-                    res.sendStatus(404);
-                    this.log.warn("User does not exist.");
-                    return;
-                }
-
-                const salt = XUtils.decodeHex(userEntry.passwordSalt);
-                const payloadHash = XUtils.encodeHex(
-                    hashPassword(credentials.password, salt)
-                );
-
-                if (payloadHash !== userEntry.passwordHash) {
-                    res.sendStatus(401);
-                    return;
-                }
-                // TODO: set a cookie here and use it for WS
-                res.sendStatus(200);
-            } catch (err) {
-                res.sendStatus(500);
-            }
         });
 
         this.api.post("/user/:id/devices", async (req, res) => {
@@ -325,16 +222,6 @@ export class Spire extends EventEmitter {
                 res.sendStatus(200);
             } else {
                 res.sendStatus(401);
-            }
-        });
-
-        this.api.get("/device/:id", async (req, res) => {
-            const device = await this.db.retrieveDevice(req.params.id);
-
-            if (device) {
-                return res.send(device);
-            } else {
-                res.sendStatus(404);
             }
         });
 
@@ -381,161 +268,6 @@ export class Spire extends EventEmitter {
                 this.log.error(err.toString());
                 return res.sendStatus(500);
             }
-        });
-
-        this.api.get("/file/:id", async (req, res) => {
-            const entry = await this.db.retrieveFile(req.params.id);
-            if (!entry) {
-                res.sendStatus(404);
-            } else {
-                fs.readFile(
-                    path.resolve("./files/" + entry.fileID),
-                    undefined,
-                    async (err, file) => {
-                        if (err) {
-                            this.log.error("error reading file");
-                            this.log.error(err);
-                            res.sendStatus(500);
-                        } else {
-                            const typeDetails = await FileType.fromBuffer(file);
-                            // TODO: fix this as well, its bloating the size
-                            const resp: XTypes.HTTP.IFileResponse = {
-                                details: entry,
-                                data: file,
-                            };
-                            if (typeDetails) {
-                                res.set("Content-type", typeDetails.mime);
-                            }
-                            res.send(resp);
-                        }
-                    }
-                );
-            }
-        });
-
-        this.api.get("/avatar/:userID", async (req, res) => {
-            fs.readFile(
-                path.resolve("./avatars/" + req.params.userID),
-                undefined,
-                async (err, file) => {
-                    if (err) {
-                        this.log.error("error reading file");
-                        this.log.error(err);
-                        res.sendStatus(404);
-                    } else {
-                        const typeDetails = await FileType.fromBuffer(file);
-                        if (typeDetails) {
-                            res.set("Content-type", typeDetails.mime);
-                        }
-                        res.send(file);
-                    }
-                }
-            );
-        });
-
-        this.api.post(
-            "/avatar/:userID",
-            multer().single("avatar"),
-            async (req, res) => {
-                const payload: XTypes.HTTP.IFilePayload = req.body;
-                const userEntry = await this.db.retrieveUser(req.params.userID);
-
-                if (!userEntry) {
-                    res.sendStatus(404);
-                    return;
-                }
-
-                const devices = await this.db.retrieveUserDeviceList(
-                    req.params.userID
-                );
-
-                let token: Uint8Array | null = null;
-                for (const device of devices) {
-                    const verified = nacl.sign.open(
-                        XUtils.decodeHex(payload.signed),
-                        XUtils.decodeHex(device.signKey)
-                    );
-                    if (verified) {
-                        token = verified;
-                    }
-                }
-                if (!token) {
-                    this.log.warn("Bad signature on token.");
-                    res.sendStatus(401);
-                    return;
-                }
-
-                try {
-                    // write the file to disk
-                    fs.writeFile(
-                        "avatars/" + userEntry.userID,
-                        req.file.buffer,
-                        () => {
-                            this.log.info(
-                                "Wrote new avatar " + userEntry.userID
-                            );
-                        }
-                    );
-                    res.sendStatus(200);
-                } catch (err) {
-                    this.log.warn(err);
-                    res.sendStatus(500);
-                }
-            }
-        );
-
-        this.api.get("/canary", async (req, res) => {
-            res.send({ canary: process.env.CANARY });
-        });
-
-        this.api.post("/file", multer().single("file"), async (req, res) => {
-            const payload: XTypes.HTTP.IFilePayload = req.body;
-
-            if (payload.nonce === "") {
-                res.sendStatus(400);
-                return;
-            }
-
-            const deviceEntry = await this.db.retrieveDevice(payload.owner);
-            if (!deviceEntry) {
-                this.log.warn("No device found.");
-                res.send(400);
-                return;
-            }
-
-            const devices = await this.db.retrieveUserDeviceList(
-                deviceEntry.owner
-            );
-
-            let token: Uint8Array | null = null;
-            for (const device of devices) {
-                const verified = nacl.sign.open(
-                    XUtils.decodeHex(payload.signed),
-                    XUtils.decodeHex(device.signKey)
-                );
-                if (verified) {
-                    token = verified;
-                }
-            }
-            if (!token) {
-                this.log.warn("Bad signature on token.");
-                res.sendStatus(401);
-                return;
-            }
-
-            const newFile: XTypes.SQL.IFile = {
-                fileID: uuid.v4(),
-                owner: payload.owner,
-                nonce: payload.nonce,
-            };
-
-            // write the file to disk
-            fs.writeFile("files/" + newFile.fileID, req.file.buffer, () => {
-                this.log.info("Wrote new file " + newFile.fileID);
-            });
-
-            await this.db.createFile(newFile);
-            res.send(newFile);
         });
 
         this.api.post("/register/key", (req, res) => {
@@ -643,13 +375,6 @@ export class Spire extends EventEmitter {
         });
     }
 }
-
-/**
- * @ignore
- */
-const jestRun = () => {
-    return process.env.JEST_WORKER_ID !== undefined;
-};
 
 export const censorUser = (user: XTypes.SQL.IUser): ICensoredUser => {
     return {
