@@ -62,7 +62,6 @@ export class ClientManager extends EventEmitter {
     constructor(
         ws: WebSocket,
         db: Database,
-        bundleQueue: string[],
         notify: (userID: string, event: string, transmissionID: string) => void,
         options?: ISpireOptions
     ) {
@@ -70,7 +69,6 @@ export class ClientManager extends EventEmitter {
         this.conn = ws;
         this.db = db;
         this.user = null;
-        this.bundleQueue = bundleQueue;
         this.device = null;
         this.notify = notify;
         this.log = createLogger("client-manager", options?.logLevel || "error");
