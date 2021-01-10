@@ -268,24 +268,29 @@ export class Spire extends EventEmitter {
         this.api.post("/user/:id/authenticate", async (req, res) => {
             const credentials: { username: string; password: string } =
                 req.body;
-            const userEntry = await this.db.retrieveUser(req.params.id);
-            if (!userEntry) {
-                res.sendStatus(404);
-                this.log.warn("User does not exist.");
-                return;
-            }
 
-            const salt = XUtils.decodeHex(userEntry.passwordSalt);
-            const payloadHash = XUtils.encodeHex(
-                hashPassword(credentials.password, salt)
-            );
+            try {
+                const userEntry = await this.db.retrieveUser(req.params.id);
+                if (!userEntry) {
+                    res.sendStatus(404);
+                    this.log.warn("User does not exist.");
+                    return;
+                }
 
-            if (payloadHash !== userEntry.passwordHash) {
-                res.sendStatus(401);
-                return;
+                const salt = XUtils.decodeHex(userEntry.passwordSalt);
+                const payloadHash = XUtils.encodeHex(
+                    hashPassword(credentials.password, salt)
+                );
+
+                if (payloadHash !== userEntry.passwordHash) {
+                    res.sendStatus(401);
+                    return;
+                }
+                // TODO: set a cookie here and use it for WS
+                res.sendStatus(200);
+            } catch (err) {
+                res.sendStatus(500);
             }
-            // TODO: set a cookie here and use it for WS
-            res.sendStatus(200);
         });
 
         this.api.post("/user/:id/devices", async (req, res) => {

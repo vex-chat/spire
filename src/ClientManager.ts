@@ -184,7 +184,14 @@ export class ClientManager extends EventEmitter {
     }
 
     private async verifyResponse(msg: XTypes.WS.IRespMsg) {
-        console.log(msg);
+        if (typeof msg.password !== "string") {
+            await this.sendErr(
+                msg.transmissionID,
+                "Password must be a string, received " + typeof msg.password
+            );
+            this.fail();
+            return;
+        }
         const user = await this.db.retrieveUser(msg.userID);
         if (user) {
             const salt = XUtils.decodeHex(user.passwordSalt);
@@ -419,11 +426,11 @@ export class ClientManager extends EventEmitter {
                 break;
             case "keyBundle":
                 if (msg.action === "RETRIEVE") {
-                    while (this.bundleQueue.includes(msg.data)) {
-                        this.log.warn("deviceID locked, waiting.");
-                        await sleep(100);
-                    }
-                    this.bundleQueue.push(msg.data);
+                    // while (this.bundleQueue.includes(msg.data)) {
+                    //     this.log.warn("deviceID locked, waiting.");
+                    //     await sleep(100);
+                    // }
+                    // this.bundleQueue.push(msg.data);
                     try {
                         const keyBundle = await this.db.getKeyBundle(msg.data);
                         if (keyBundle) {
@@ -438,10 +445,10 @@ export class ClientManager extends EventEmitter {
                         this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
-                    this.bundleQueue.splice(
-                        this.bundleQueue.indexOf(msg.data),
-                        1
-                    );
+                    // this.bundleQueue.splice(
+                    //     this.bundleQueue.indexOf(msg.data),
+                    //     1
+                    // );
                 }
                 break;
             case "mail":
