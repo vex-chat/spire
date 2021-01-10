@@ -52,7 +52,6 @@ export class ClientManager extends EventEmitter {
     private user: XTypes.SQL.IUser | null;
     private device: XTypes.SQL.IDevice | null;
     private log: winston.Logger;
-    private bundleQueue: string[];
     private notify: (
         userID: string,
         event: string,
@@ -426,11 +425,6 @@ export class ClientManager extends EventEmitter {
                 break;
             case "keyBundle":
                 if (msg.action === "RETRIEVE") {
-                    // while (this.bundleQueue.includes(msg.data)) {
-                    //     this.log.warn("deviceID locked, waiting.");
-                    //     await sleep(100);
-                    // }
-                    // this.bundleQueue.push(msg.data);
                     try {
                         const keyBundle = await this.db.getKeyBundle(msg.data);
                         if (keyBundle) {
@@ -445,10 +439,6 @@ export class ClientManager extends EventEmitter {
                         this.log.error(err);
                         this.sendErr(msg.transmissionID, err.toString());
                     }
-                    // this.bundleQueue.splice(
-                    //     this.bundleQueue.indexOf(msg.data),
-                    //     1
-                    // );
                 }
                 break;
             case "mail":
