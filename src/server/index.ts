@@ -33,10 +33,11 @@ for (const dir of directories) {
 export const initApp = (
     api: expressWs.Application,
     db: Database,
-    log: winston.Logger
+    log: winston.Logger,
+    tokenValidator: (key: string, scope: XTypes.HTTP.TokenScopes) => boolean
 ) => {
     // INIT ROUTERS
-    const userRouter = getUserRouter(db, log);
+    const userRouter = getUserRouter(db, log, tokenValidator);
 
     api.use(express.json({ limit: "20mb" }));
     api.use(helmet());

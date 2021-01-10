@@ -14,7 +14,7 @@ import WebSocket from "ws";
 import { initApp } from "./server";
 import { censorUser } from "./server/utils";
 import { ClientManager } from "./ClientManager";
-import { Database, hashPassword } from "./Database";
+import { Database } from "./Database";
 import { createLogger } from "./utils/createLogger";
 
 // expiry of regkeys
@@ -155,7 +155,7 @@ export class Spire extends EventEmitter {
 
     private init(apiPort: number): void {
         // initialize the expression app configuration with loose routes/handlers
-        initApp(this.api, this.db, this.log);
+        initApp(this.api, this.db, this.log, this.validateToken);
 
         // All the app logic strongly coupled to spire class :/
         this.api.ws("/socket", (ws, req) => {
@@ -186,44 +186,6 @@ export class Spire extends EventEmitter {
                     "Current authorized clients: " + this.clients.length
                 );
             });
-        });
-
-        this.api.post("/user/:id/devices", async (req, res) => {
-            const devicePayload: XTypes.HTTP.IDevicePayload = req.body;
-
-            const userEntry = await this.db.retrieveUser(req.params.id);
-            if (!userEntry) {
-                res.sendStatus(404);
-                this.log.warn("User does not exist.");
-                return;
-            }
-            const salt = XUtils.decodeHex(userEntry.passwordSalt);
-            const payloadHash = XUtils.encodeHex(
-                hashPassword(devicePayload.password, salt)
-            );
-
-            if (payloadHash !== userEntry.passwordHash) {
-                res.sendStatus(401);
-                return;
-            }
-
-            const token = nacl.sign.open(
-                XUtils.decodeHex(devicePayload.signed),
-                XUtils.decodeHex(devicePayload.signKey)
-            );
-
-            if (!token) {
-                this.log.warn("Invalid signature on token.");
-                res.sendStatus(400);
-                return;
-            }
-
-            if (this.validateToken(uuid.stringify(token), TokenScopes.Device)) {
-                await this.db.createDevice(userEntry.userID, devicePayload);
-                res.sendStatus(200);
-            } else {
-                res.sendStatus(401);
-            }
         });
 
         this.api.get("/token/:tokenType", async (req, res) => {
