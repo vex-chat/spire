@@ -1,9 +1,9 @@
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import express from "express";
-import winston from "winston";
 import nacl from "tweetnacl";
 import { stringify } from "uuid";
+import winston from "winston";
 
 import { Database, hashPassword } from "../Database";
 import { censorUser } from "./utils";

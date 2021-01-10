@@ -11,9 +11,9 @@ import winston from "winston";
 
 import { Database } from "../Database";
 
-import { getUserRouter } from "./user";
-import { getFileRouter } from "./file";
 import { getAvatarRouter } from "./avatar";
+import { getFileRouter } from "./file";
+import { getUserRouter } from "./user";
 
 // expiry of regkeys
 export const EXPIRY_TIME = 1000 * 60 * 5;

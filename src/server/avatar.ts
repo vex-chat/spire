@@ -1,13 +1,13 @@
-import path from "path";
 import fs from "fs";
+import path from "path";
 
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import express from "express";
-import winston from "winston";
 import FileType from "file-type";
-import nacl from "tweetnacl";
 import multer from "multer";
+import nacl from "tweetnacl";
+import winston from "winston";
 
 import { Database } from "../Database";
 

@@ -11,10 +11,10 @@ import * as uuid from "uuid";
 import winston from "winston";
 import WebSocket from "ws";
 
-import { initApp } from "./server";
-import { censorUser } from "./server/utils";
 import { ClientManager } from "./ClientManager";
 import { Database } from "./Database";
+import { initApp } from "./server";
+import { censorUser } from "./server/utils";
 import { createLogger } from "./utils/createLogger";
 
 // expiry of regkeys
