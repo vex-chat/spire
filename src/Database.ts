@@ -15,7 +15,6 @@ export const ITERATIONS = 1000;
 export class Database extends EventEmitter {
     private db: knex<any, unknown[]>;
     private log: winston.Logger;
-    private otkQueue: string[] = [];
 
     constructor(options?: ISpireOptions) {
         super();
