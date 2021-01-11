@@ -93,17 +93,30 @@ export class Spire extends EventEmitter {
         userID: string,
         event: string,
         transmissionID: string,
-        data?: any
+        data?: any,
+        deviceID?: string
     ): void {
         for (const client of this.clients) {
-            if (client.getUser().userID === userID) {
-                const msg: XTypes.WS.INotifyMsg = {
-                    transmissionID,
-                    type: "notify",
-                    event,
-                    data,
-                };
-                client.send(msg);
+            if (deviceID) {
+                if (client.getDevice().deviceID === deviceID) {
+                    const msg: XTypes.WS.INotifyMsg = {
+                        transmissionID,
+                        type: "notify",
+                        event,
+                        data,
+                    };
+                    client.send(msg);
+                }
+            } else {
+                if (client.getUser().userID === userID) {
+                    const msg: XTypes.WS.INotifyMsg = {
+                        transmissionID,
+                        type: "notify",
+                        event,
+                        data,
+                    };
+                    client.send(msg);
+                }
             }
         }
     }

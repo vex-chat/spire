@@ -58,7 +58,8 @@ export class ClientManager extends EventEmitter {
         userID: string,
         event: string,
         transmissionID: string,
-        data?: any
+        data?: any,
+        deviceID?: string
     ) => void;
 
     constructor(
@@ -80,10 +81,10 @@ export class ClientManager extends EventEmitter {
     }
 
     public toString() {
-        if (!this.user) {
+        if (!this.user || !this.device) {
             return "Unauthorized#0000";
         }
-        return this.user.username + "#" + this.user.userID.slice(0, 4);
+        return this.user.username + "<" + this.getDevice().deviceID + ">";
     }
 
     public getUser(): XTypes.SQL.IUser {
@@ -118,6 +119,10 @@ export class ClientManager extends EventEmitter {
             this.log.warn(err.toString());
             this.fail();
         }
+    }
+
+    public getDevice(): XTypes.SQL.IDevice {
+        return this.device!;
     }
 
     private authorize(transmissionID: string) {
@@ -156,10 +161,6 @@ export class ClientManager extends EventEmitter {
             this.ping();
             await sleep(5000);
         }
-    }
-
-    private getDevice(): XTypes.SQL.IDevice {
-        return this.device!;
     }
 
     private ping() {
@@ -490,7 +491,9 @@ export class ClientManager extends EventEmitter {
                         this.notify(
                             deviceDetails.owner,
                             "mail",
-                            msg.transmissionID
+                            msg.transmissionID,
+                            null,
+                            msg.data.recipient
                         );
                     } catch (err) {
                         this.log.error(err);
