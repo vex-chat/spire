@@ -6,9 +6,8 @@ A vex server implementation in NodeJS.
 
 ## dev setup
 
-
-
 steps:
+
 ```
 git clone git@github.com:vex-chat/spire
 cd spire
@@ -17,6 +16,7 @@ cd spire
 set up your .env file in the root of the project
 
 ### sample env file for mysql:
+
 ```
 SQL_HOST=localhost
 SQL_PORT=3306
@@ -32,6 +32,7 @@ CANARY=true
 ```
 
 ### sample env file for sqlite3:
+
 ```
 DB_TYPE=sqlite3
 

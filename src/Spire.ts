@@ -155,7 +155,7 @@ export class Spire extends EventEmitter {
 
     private init(apiPort: number): void {
         // initialize the expression app configuration with loose routes/handlers
-        initApp(this.api, this.db, this.log, this.validateToken);
+        initApp(this.api, this.db, this.log, this.validateToken.bind(this));
 
         // All the app logic strongly coupled to spire class :/
         this.api.ws("/socket", (ws, req) => {
