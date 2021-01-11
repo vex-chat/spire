@@ -199,10 +199,12 @@ export class Database extends EventEmitter {
     }
 
     public async getOTK(deviceID: string): Promise<XTypes.WS.IPreKeys | null> {
-        while (this.otkQueue.includes(deviceID)) {
-            await sleep(100);
-        }
-        this.otkQueue.push(deviceID);
+        // while (this.otkQueue.includes(deviceID)) {
+        //     console.warn("deviceID locked, waiting.");
+        //     console.warn(this.otkQueue);
+        //     await sleep(100);
+        // }
+        // this.otkQueue.push(deviceID);
         const rows: XTypes.SQL.IPreKeys[] = await this.db("oneTimeKeys")
             .select()
             .where({ deviceID })
@@ -225,10 +227,8 @@ export class Database extends EventEmitter {
                 .from("oneTimeKeys")
                 .delete()
                 .where({ deviceID, index: otk.index });
-            this.otkQueue.splice(this.otkQueue.indexOf(deviceID));
             return otk;
         } catch (err) {
-            this.otkQueue.splice(this.otkQueue.indexOf(deviceID));
             throw err;
         }
     }
