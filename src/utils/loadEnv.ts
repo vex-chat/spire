@@ -14,6 +14,7 @@ export function loadEnv(): void {
         // "SQL_PORT",
         "CANARY",
         "DB_TYPE",
+        "SPK",
     ];
     for (const required of requiredEnvVars) {
         if (process.env[required] === undefined) {

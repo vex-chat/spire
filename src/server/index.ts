@@ -1,6 +1,7 @@
 import fs from "fs";
 
 import { XTypes } from "@vex-chat/types";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import expressWs from "express-ws";
@@ -11,6 +12,7 @@ import winston from "winston";
 
 import { Database } from "../Database";
 
+import jwt from "jsonwebtoken";
 import { getAvatarRouter } from "./avatar";
 import { getFileRouter } from "./file";
 import { getUserRouter } from "./user";
@@ -31,7 +33,8 @@ export const initApp = (
     api: expressWs.Application,
     db: Database,
     log: winston.Logger,
-    tokenValidator: (key: string, scope: XTypes.HTTP.TokenScopes) => boolean
+    tokenValidator: (key: string, scope: XTypes.HTTP.TokenScopes) => boolean,
+    signKeys: nacl.SignKeyPair
 ) => {
     // INIT ROUTERS
     const userRouter = getUserRouter(db, log, tokenValidator);
@@ -41,12 +44,25 @@ export const initApp = (
     // MIDDLEWARE
     api.use(express.json({ limit: "20mb" }));
     api.use(helmet());
+    api.use(cookieParser());
+    api.use((req, res, next) => {
+        if (req.cookies.auth) {
+            try {
+                const result = jwt.verify(req.cookies.auth, process.env.SPK!);
+                // lol glad this is a try/catch block
+                (req as any).user = (result as any).user;
+            } catch (err) {
+                console.warn(err.toString());
+            }
+        }
+        next();
+    });
 
     if (!jestRun()) {
         api.use(morgan("dev", { stream: process.stdout }));
     }
 
-    api.use(cors());
+    api.use(cors({ credentials: true }));
 
     // SIMPLE RESOURCES
     api.get("/server/:id", async (req, res) => {

@@ -14,7 +14,7 @@ import winston from "winston";
 import WebSocket from "ws";
 
 import { Database, hashPassword } from "./Database";
-import { censorUser } from "./server/utils";
+import { censorUser, ICensoredUser } from "./server/utils";
 import { EXPIRY_TIME, ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
@@ -52,6 +52,7 @@ export class ClientManager extends EventEmitter {
     private failed: boolean = false;
     private db: Database;
     private user: XTypes.SQL.IUser | null;
+    private jwtDetails: ICensoredUser;
     private device: XTypes.SQL.IDevice | null;
     private log: winston.Logger;
     private notify: (
@@ -66,12 +67,14 @@ export class ClientManager extends EventEmitter {
         ws: WebSocket,
         db: Database,
         notify: (userID: string, event: string, transmissionID: string) => void,
+        jwtDetails: ICensoredUser,
         options?: ISpireOptions
     ) {
         super();
         this.conn = ws;
         this.db = db;
         this.user = null;
+        this.jwtDetails = jwtDetails;
         this.device = null;
         this.notify = notify;
         this.log = createLogger("client-manager", options?.logLevel || "error");
@@ -184,26 +187,8 @@ export class ClientManager extends EventEmitter {
     }
 
     private async verifyResponse(msg: XTypes.WS.IRespMsg) {
-        if (typeof msg.password !== "string") {
-            await this.sendErr(
-                msg.transmissionID,
-                "Password must be a string, received " + typeof msg.password
-            );
-            this.fail();
-            return;
-        }
-        const user = await this.db.retrieveUser(msg.userID);
+        const user = await this.db.retrieveUser(this.jwtDetails.userID);
         if (user) {
-            const salt = XUtils.decodeHex(user.passwordSalt);
-            const payloadHash = XUtils.encodeHex(
-                hashPassword(msg.password, salt)
-            );
-            if (payloadHash !== user.passwordHash) {
-                await this.sendErr(msg.transmissionID, "Invalid password.");
-                this.fail();
-                return;
-            }
-
             const devices = await this.db.retrieveUserDeviceList(user.userID);
             let message: Uint8Array | null = null;
             for (const device of devices) {
