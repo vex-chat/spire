@@ -102,8 +102,11 @@ export const getUserRouter = (
         }
 
         if (tokenValidator(stringify(token), TokenScopes.Device)) {
-            await db.createDevice(userEntry.userID, devicePayload);
-            res.sendStatus(200);
+            const device = await db.createDevice(
+                userEntry.userID,
+                devicePayload
+            );
+            res.send(device);
         } else {
             res.sendStatus(401);
         }
