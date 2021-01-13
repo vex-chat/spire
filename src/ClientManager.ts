@@ -14,7 +14,7 @@ import winston from "winston";
 import WebSocket from "ws";
 
 import { Database, hashPassword } from "./Database";
-import { censorUser } from "./server/utils";
+import { censorUser, ICensoredUser } from "./server/utils";
 import { EXPIRY_TIME, ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
@@ -53,25 +53,29 @@ export class ClientManager extends EventEmitter {
     private failed: boolean = false;
     private db: Database;
     private user: XTypes.SQL.IUser | null;
+    private jwtDetails: ICensoredUser;
     private device: XTypes.SQL.IDevice | null;
     private log: winston.Logger;
     private notify: (
         userID: string,
         event: string,
         transmissionID: string,
-        data?: any
+        data?: any,
+        deviceID?: string
     ) => void;
 
     constructor(
         ws: WebSocket,
         db: Database,
         notify: (userID: string, event: string, transmissionID: string) => void,
+        jwtDetails: ICensoredUser,
         options?: ISpireOptions
     ) {
         super();
         this.conn = ws;
         this.db = db;
         this.user = null;
+        this.jwtDetails = jwtDetails;
         this.device = null;
         this.notify = notify;
         this.log = createLogger("client-manager", options?.logLevel || "error");
@@ -81,10 +85,10 @@ export class ClientManager extends EventEmitter {
     }
 
     public toString() {
-        if (!this.user) {
+        if (!this.user || !this.device) {
             return "Unauthorized#0000";
         }
-        return this.user.username + "#" + this.user.userID.slice(0, 4);
+        return this.user.username + "<" + this.getDevice().deviceID + ">";
     }
 
     public getUser(): XTypes.SQL.IUser {
@@ -119,6 +123,10 @@ export class ClientManager extends EventEmitter {
             this.log.warn(err.toString());
             this.fail();
         }
+    }
+
+    public getDevice(): XTypes.SQL.IDevice {
+        return this.device!;
     }
 
     private authorize(transmissionID: string) {
@@ -159,10 +167,6 @@ export class ClientManager extends EventEmitter {
         }
     }
 
-    private getDevice(): XTypes.SQL.IDevice {
-        return this.device!;
-    }
-
     private ping() {
         if (!this.alive) {
             this.fail();
@@ -184,26 +188,8 @@ export class ClientManager extends EventEmitter {
     }
 
     private async verifyResponse(msg: XTypes.WS.IRespMsg) {
-        if (typeof msg.password !== "string") {
-            await this.sendErr(
-                msg.transmissionID,
-                "Password must be a string, received " + typeof msg.password
-            );
-            this.fail();
-            return;
-        }
-        const user = await this.db.retrieveUser(msg.userID);
+        const user = await this.db.retrieveUser(this.jwtDetails.userID);
         if (user) {
-            const salt = XUtils.decodeHex(user.passwordSalt);
-            const payloadHash = XUtils.encodeHex(
-                hashPassword(msg.password, salt)
-            );
-            if (payloadHash !== user.passwordHash) {
-                await this.sendErr(msg.transmissionID, "Invalid password.");
-                this.fail();
-                return;
-            }
-
             const devices = await this.db.retrieveUserDeviceList(user.userID);
             let message: Uint8Array | null = null;
             for (const device of devices) {
@@ -538,7 +524,9 @@ export class ClientManager extends EventEmitter {
                         this.notify(
                             deviceDetails.owner,
                             "mail",
-                            msg.transmissionID
+                            msg.transmissionID,
+                            null,
+                            msg.data.recipient
                         );
                     } catch (err) {
                         this.log.error(err);

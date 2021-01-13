@@ -6,15 +6,17 @@ import { XTypes } from "@vex-chat/types";
 import { EventEmitter } from "events";
 import express from "express";
 import expressWs from "express-ws";
+
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
 import winston from "winston";
 import WebSocket from "ws";
 
+import jwt from "jsonwebtoken";
 import { ClientManager } from "./ClientManager";
-import { Database } from "./Database";
+import { Database, hashPassword } from "./Database";
 import { initApp } from "./server";
-import { censorUser } from "./server/utils";
+import { censorUser, ICensoredUser } from "./server/utils";
 import { createLogger } from "./utils/createLogger";
 
 // expiry of regkeys
@@ -53,14 +55,17 @@ export class Spire extends EventEmitter {
     private api = this.expWs.app;
     private wss: WebSocket.Server = this.expWs.getWss();
 
+    private signKeys: nacl.SignKeyPair;
+
     private actionTokens: XTypes.HTTP.IActionToken[] = [];
 
     private log: winston.Logger;
     private server: Server | null = null;
     private options: ISpireOptions | undefined;
 
-    constructor(options?: ISpireOptions) {
+    constructor(SK: string, options?: ISpireOptions) {
         super();
+        this.signKeys = nacl.sign.keyPair.fromSecretKey(XUtils.decodeHex(SK));
 
         this.db = new Database(options);
 
@@ -93,17 +98,30 @@ export class Spire extends EventEmitter {
         userID: string,
         event: string,
         transmissionID: string,
-        data?: any
+        data?: any,
+        deviceID?: string
     ): void {
         for (const client of this.clients) {
-            if (client.getUser().userID === userID) {
-                const msg: XTypes.WS.INotifyMsg = {
-                    transmissionID,
-                    type: "notify",
-                    event,
-                    data,
-                };
-                client.send(msg);
+            if (deviceID) {
+                if (client.getDevice().deviceID === deviceID) {
+                    const msg: XTypes.WS.INotifyMsg = {
+                        transmissionID,
+                        type: "notify",
+                        event,
+                        data,
+                    };
+                    client.send(msg);
+                }
+            } else {
+                if (client.getUser().userID === userID) {
+                    const msg: XTypes.WS.INotifyMsg = {
+                        transmissionID,
+                        type: "notify",
+                        event,
+                        data,
+                    };
+                    client.send(msg);
+                }
             }
         }
     }
@@ -155,15 +173,39 @@ export class Spire extends EventEmitter {
 
     private init(apiPort: number): void {
         // initialize the expression app configuration with loose routes/handlers
-        initApp(this.api, this.db, this.log, this.validateToken.bind(this));
+        initApp(
+            this.api,
+            this.db,
+            this.log,
+            this.validateToken.bind(this),
+            this.signKeys
+        );
 
         // All the app logic strongly coupled to spire class :/
         this.api.ws("/socket", (ws, req) => {
+            const jwtDetails: ICensoredUser = (req as any).user;
+            if (!jwtDetails) {
+                this.log.warn("User attempted to open socket with no jwt.");
+                const err: XTypes.WS.IBaseMsg = {
+                    type: "unauthorized",
+                    transmissionID: uuid.v4(),
+                };
+                const msg = XUtils.packMessage(err);
+                ws.send(msg);
+                ws.close();
+                return;
+            }
+
             this.log.info("New client initiated.");
+            this.log.info(jwtDetails);
+
+            console.log((req as any).user);
+
             const client = new ClientManager(
                 ws,
                 this.db,
                 this.notify.bind(this),
+                jwtDetails,
                 this.options
             );
 
@@ -230,6 +272,58 @@ export class Spire extends EventEmitter {
             } catch (err) {
                 this.log.error(err.toString());
                 return res.sendStatus(500);
+            }
+        });
+
+        this.api.post("/auth", async (req, res) => {
+            const credentials: { username: string; password: string } =
+                req.body;
+
+            if (typeof credentials.password !== "string") {
+                res.status(400).send(
+                    "Password is required and must be a string."
+                );
+                return;
+            }
+
+            if (typeof credentials.username !== "string") {
+                res.status(400).send(
+                    "Username is required and must be a string."
+                );
+                return;
+            }
+
+            try {
+                const userEntry = await this.db.retrieveUser(
+                    credentials.username
+                );
+                if (!userEntry) {
+                    res.sendStatus(404);
+                    this.log.warn("User does not exist.");
+                    return;
+                }
+
+                const salt = XUtils.decodeHex(userEntry.passwordSalt);
+                const payloadHash = XUtils.encodeHex(
+                    hashPassword(credentials.password, salt)
+                );
+
+                if (payloadHash !== userEntry.passwordHash) {
+                    res.sendStatus(401);
+                    return;
+                }
+
+                // TODO: set a cookie here and use it for WS
+                const token = jwt.sign(
+                    { user: censorUser(userEntry) },
+                    process.env.SPK!,
+                    { expiresIn: EXPIRY_TIME }
+                );
+                res.cookie("auth", token);
+                res.send({ user: censorUser(userEntry), token });
+            } catch (err) {
+                console.log(err.toString());
+                res.sendStatus(500);
             }
         });
 

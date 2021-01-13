@@ -1,9 +1,11 @@
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import express from "express";
+import jwt from "jsonwebtoken";
 import nacl from "tweetnacl";
 import { stringify } from "uuid";
 import winston from "winston";
+import { EXPIRY_TIME } from ".";
 
 import { Database, hashPassword } from "../Database";
 import { censorUser } from "./utils";
@@ -35,6 +37,10 @@ export const getUserRouter = (
     router.delete("/:userID/devices/:deviceID", async (req, res) => {
         const { userID, deviceID } = req.params;
         const { password } = req.body;
+
+        if (typeof password !== "string") {
+            res.status(400).send("Password must be a string.");
+        }
 
         const userEntry = await db.retrieveUser(userID);
 
@@ -73,33 +79,6 @@ export const getUserRouter = (
         res.sendStatus(200);
     });
 
-    router.post("/:id/authenticate", async (req, res) => {
-        const credentials: { username: string; password: string } = req.body;
-
-        try {
-            const userEntry = await db.retrieveUser(req.params.id);
-            if (!userEntry) {
-                res.sendStatus(404);
-                log.warn("User does not exist.");
-                return;
-            }
-
-            const salt = XUtils.decodeHex(userEntry.passwordSalt);
-            const payloadHash = XUtils.encodeHex(
-                hashPassword(credentials.password, salt)
-            );
-
-            if (payloadHash !== userEntry.passwordHash) {
-                res.sendStatus(401);
-                return;
-            }
-            // TODO: set a cookie here and use it for WS
-            res.sendStatus(200);
-        } catch (err) {
-            res.sendStatus(500);
-        }
-    });
-
     router.post("/:id/devices", async (req, res) => {
         const devicePayload: XTypes.HTTP.IDevicePayload = req.body;
 
@@ -133,8 +112,11 @@ export const getUserRouter = (
         }
 
         if (tokenValidator(stringify(token), TokenScopes.Device)) {
-            await db.createDevice(userEntry.userID, devicePayload);
-            res.sendStatus(200);
+            const device = await db.createDevice(
+                userEntry.userID,
+                devicePayload
+            );
+            res.send(device);
         } else {
             res.sendStatus(401);
         }

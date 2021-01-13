@@ -1,6 +1,6 @@
 import { XTypes } from "@vex-chat/types";
 
-interface ICensoredUser {
+export interface ICensoredUser {
     userID: string;
     username: string;
     lastSeen: Date;
