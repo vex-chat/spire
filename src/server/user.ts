@@ -44,23 +44,33 @@ export const getUserRouter = (
             return;
         }
 
-        const deviceEntry = await db.retrieveDevice(deviceID);
-
-        if (!deviceEntry) {
-            log.warn("This device doesn't exist.");
-            res.sendStatus(404);
-        }
-
         const salt = XUtils.decodeHex(userEntry.passwordSalt);
         const payloadHash = XUtils.encodeHex(hashPassword(password, salt));
 
         if (payloadHash !== userEntry.passwordHash) {
             res.sendStatus(401);
             log.info("Wrong password.");
-        } else {
-            db.deleteDevice(deviceID);
-            res.sendStatus(200);
         }
+
+        const deviceEntry = await db.retrieveDevice(deviceID);
+
+        if (!deviceEntry) {
+            log.warn("This device doesn't exist.");
+            res.sendStatus(404);
+            return;
+        }
+
+        const userDevices = await db.retrieveUserDeviceList(userID);
+        if (userDevices.length === 1) {
+            log.warn("User can not delete the only device on their account.");
+            res.status(400).send({
+                error: "You must have at least one device on your account.",
+            });
+            return;
+        }
+
+        db.deleteDevice(deviceID);
+        res.sendStatus(200);
     });
 
     router.post("/:id/authenticate", async (req, res) => {

@@ -418,6 +418,28 @@ export class Database extends EventEmitter {
             .delete();
     }
 
+    public async deletePermission(permissionID: string): Promise<void> {
+        await this.db
+            .from("permissions")
+            .where({ permissionID })
+            .delete();
+    }
+
+    public async retrievePermission(
+        permissionID: string
+    ): Promise<XTypes.SQL.IPermission | null> {
+        const rows = await this.db
+            .from("permissions")
+            .where({ permissionID })
+            .select();
+
+        if (rows.length === 0) {
+            return null;
+        }
+
+        return rows[0];
+    }
+
     public async deleteChannel(channelID: string): Promise<void> {
         await this.deletePermissions(channelID);
         await this.db

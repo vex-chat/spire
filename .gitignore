@@ -7,3 +7,4 @@ files
 *.tgz
 avatars
 *.sqlite
+.DS_Store

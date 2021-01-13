@@ -21,6 +21,7 @@ import { createUint8UUID } from "./utils/createUint8UUID";
 
 const POWER_LEVELS = {
     CREATE: 50,
+    DELETE: 50,
 };
 
 function emptyHeader() {
@@ -290,6 +291,53 @@ export class ClientManager extends EventEmitter {
                         break;
                     } catch (err) {
                         this.sendErr(msg.transmissionID, err.toString());
+                    }
+                }
+                if (msg.action === "DELETE") {
+                    try {
+                        // msg.data is permID
+                        const permToDelete = await this.db.retrievePermission(
+                            msg.data
+                        );
+                        if (!permToDelete) {
+                            this.sendErr(
+                                msg.transmissionID,
+                                "That doesn't exist."
+                            );
+                            break;
+                        }
+
+                        const permissions = await this.db.retrievePermissions(
+                            this.getUser().userID,
+                            permToDelete.resourceType
+                        );
+
+                        let found = false;
+                        for (const perm of permissions) {
+                            // msg.data is resourceID
+                            if (
+                                perm.resourceID === permToDelete.resourceID &&
+                                (perm.userID === this.getUser().userID ||
+                                    (perm.powerLevel > POWER_LEVELS.DELETE &&
+                                        perm.powerLevel >
+                                            permToDelete.powerLevel))
+                            ) {
+                                this.db.deletePermission(perm.permissionID);
+                                this.sendSuccess(msg.transmissionID, null);
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            this.sendErr(
+                                msg.transmissionID,
+                                "You don't have permission to do that."
+                            );
+                            break;
+                        }
+                    } catch (err) {
+                        this.sendErr(msg.transmissionID, err.toString());
+                        break;
                     }
                 }
                 if (msg.action === "CREATE") {
