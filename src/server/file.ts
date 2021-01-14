@@ -20,6 +20,8 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         if (!entry) {
             res.sendStatus(404);
         } else {
+            fs.createReadStream("./files/" + entry.fileID).pipe(res);
+
             fs.readFile(
                 path.resolve("./files/" + entry.fileID),
                 undefined,
@@ -29,19 +31,34 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
                         log.error(err);
                         res.sendStatus(500);
                     } else {
-                        const typeDetails = await FileType.fromBuffer(file);
                         // TODO: fix this as well, its bloating the size
                         const resp: XTypes.HTTP.IFileResponse = {
                             details: entry,
                             data: file,
                         };
-                        if (typeDetails) {
-                            res.set("Content-type", typeDetails.mime);
-                        }
                         res.send(resp);
                     }
                 }
             );
+        }
+    });
+
+    router.get("/:id/details", async (req, res) => {
+        const entry = await db.retrieveFile(req.params.id);
+        if (!entry) {
+            res.sendStatus(404);
+        } else {
+            fs.stat("./files/" + entry.fileID, (err, stats) => {
+                if (err) {
+                    res.sendStatus(500);
+                    return;
+                }
+                res.send({
+                    ...entry,
+                    size: stats.size,
+                    birthtime: stats.birthtime,
+                });
+            });
         }
     });
 
