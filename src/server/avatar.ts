@@ -15,23 +15,18 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
 
     router.get("/:userID", async (req, res) => {
-        fs.readFile(
-            path.resolve("./avatars/" + req.params.userID),
-            undefined,
-            async (err, file) => {
-                if (err) {
-                    log.error("error reading file");
-                    log.error(err);
-                    res.sendStatus(404);
-                } else {
-                    const typeDetails = await FileType.fromBuffer(file);
-                    if (typeDetails) {
-                        res.set("Content-type", typeDetails.mime);
-                    }
-                    res.send(file);
-                }
-            }
+        const stream = fs.createReadStream(
+            path.resolve("./avatars/" + req.params.userID)
         );
+        stream.on("error", () => {
+            res.send(404);
+        });
+
+        const typeDetails = await FileType.fromStream(stream);
+        if (typeDetails) {
+            res.set("Content-type", typeDetails.mime);
+        }
+        stream.pipe(res);
     });
 
     router.post("/:userID", multer().single("avatar"), async (req, res) => {

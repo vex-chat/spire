@@ -4,7 +4,6 @@ import path from "path";
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import express from "express";
-import FileType from "file-type";
 import multer from "multer";
 import nacl from "tweetnacl";
 import { v4 } from "uuid";
@@ -20,22 +19,11 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         if (!entry) {
             res.sendStatus(404);
         } else {
-            fs.createReadStream("./files/" + entry.fileID).pipe(res);
-
-            fs.readFile(
-                path.resolve("./files/" + entry.fileID),
-                undefined,
-                async (err, file) => {
-                    if (err) {
-                        log.error("error reading file");
-                        log.error(err);
-                        res.sendStatus(500);
-                    } else {
-                        // TODO: fix this as well, its bloating the size
-                        res.send(file);
-                    }
-                }
-            );
+            const stream = fs.createReadStream("./files/" + entry.fileID);
+            stream.on("error", () => {
+                res.send(500);
+            });
+            stream.pipe(res);
         }
     });
 
