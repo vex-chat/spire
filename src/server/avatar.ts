@@ -15,10 +15,9 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
 
     router.get("/:userID", async (req, res) => {
-        const stream = fs.createReadStream(
-            path.resolve("./avatars/" + req.params.userID)
-        );
-        stream.on("error", () => {
+        const stream = fs.createReadStream("./avatars/" + req.params.userID);
+        stream.on("error", (err) => {
+            log.error(err.toString());
             res.send(404);
         });
 
@@ -26,7 +25,9 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
         if (typeDetails) {
             res.set("Content-type", typeDetails.mime);
         }
-        stream.pipe(res);
+
+        const stream2 = fs.createReadStream("./avatars/" + req.params.userID);
+        stream2.pipe(res);
     });
 
     router.post("/:userID", multer().single("avatar"), async (req, res) => {
