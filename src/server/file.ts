@@ -32,11 +32,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
                         res.sendStatus(500);
                     } else {
                         // TODO: fix this as well, its bloating the size
-                        const resp: XTypes.HTTP.IFileResponse = {
-                            details: entry,
-                            data: file,
-                        };
-                        res.send(resp);
+                        res.send(file);
                     }
                 }
             );
@@ -48,15 +44,15 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         if (!entry) {
             res.sendStatus(404);
         } else {
-            fs.stat("./files/" + entry.fileID, (err, stats) => {
+            fs.stat(path.resolve("./files/" + entry.fileID), (err, stat) => {
                 if (err) {
                     res.sendStatus(500);
                     return;
                 }
                 res.send({
                     ...entry,
-                    size: stats.size,
-                    birthtime: stats.birthtime,
+                    size: stat.size,
+                    birthtime: stat.birthtime,
                 });
             });
         }
