@@ -17,8 +17,8 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
     router.get("/:userID", async (req, res) => {
         const stream = fs.createReadStream("./avatars/" + req.params.userID);
         stream.on("error", (err) => {
-            log.error(err.toString());
-            res.send(404);
+            // log.error(err.toString());
+            res.sendStatus(404);
         });
 
         const typeDetails = await FileType.fromStream(stream);
@@ -26,7 +26,12 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
             res.set("Content-type", typeDetails.mime);
         }
 
+        res.set("Cache-control", "public, max-age=31536000");
         const stream2 = fs.createReadStream("./avatars/" + req.params.userID);
+        stream2.on("error", (err) => {
+            log.error(err.toString());
+            res.sendStatus(500);
+        });
         stream2.pipe(res);
     });
 
@@ -40,6 +45,27 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
         }
 
         const devices = await db.retrieveUserDeviceList([req.params.userID]);
+
+        const mimeType = await FileType.fromBuffer(req.file.buffer);
+        console.log(mimeType);
+
+        const allowedTypes = [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/apng",
+            "image/avif",
+            "image/svg+xml",
+        ];
+
+        if (!allowedTypes.includes(mimeType?.mime || "no/type")) {
+            res.status(400).send({
+                error:
+                    "Unsupported file type. Expected jpeg, png, gif, apng, avif, or svg but received " +
+                    mimeType?.ext,
+            });
+            return;
+        }
 
         let token: Uint8Array | null = null;
         for (const device of devices) {

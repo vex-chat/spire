@@ -38,6 +38,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
                     res.sendStatus(500);
                     return;
                 }
+                res.set("Cache-control", "public, max-age=31536000");
                 res.send({
                     ...entry,
                     size: stat.size,
