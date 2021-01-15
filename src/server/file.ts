@@ -4,7 +4,6 @@ import path from "path";
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import express from "express";
-import FileType from "file-type";
 import multer from "multer";
 import nacl from "tweetnacl";
 import { v4 } from "uuid";
@@ -20,28 +19,31 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         if (!entry) {
             res.sendStatus(404);
         } else {
-            fs.readFile(
-                path.resolve("./files/" + entry.fileID),
-                undefined,
-                async (err, file) => {
-                    if (err) {
-                        log.error("error reading file");
-                        log.error(err);
-                        res.sendStatus(500);
-                    } else {
-                        const typeDetails = await FileType.fromBuffer(file);
-                        // TODO: fix this as well, its bloating the size
-                        const resp: XTypes.HTTP.IFileResponse = {
-                            details: entry,
-                            data: file,
-                        };
-                        if (typeDetails) {
-                            res.set("Content-type", typeDetails.mime);
-                        }
-                        res.send(resp);
-                    }
+            const stream = fs.createReadStream("./files/" + entry.fileID);
+            stream.on("error", (err) => {
+                console.log(err.toString());
+                res.send(500);
+            });
+            stream.pipe(res);
+        }
+    });
+
+    router.get("/:id/details", async (req, res) => {
+        const entry = await db.retrieveFile(req.params.id);
+        if (!entry) {
+            res.sendStatus(404);
+        } else {
+            fs.stat(path.resolve("./files/" + entry.fileID), (err, stat) => {
+                if (err) {
+                    res.sendStatus(500);
+                    return;
                 }
-            );
+                res.send({
+                    ...entry,
+                    size: stat.size,
+                    birthtime: stat.birthtime,
+                });
+            });
         }
     });
 
