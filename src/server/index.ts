@@ -85,6 +85,12 @@ export const initApp = (
         }
     });
 
+    api.post("/deviceList", async (req, res) => {
+        const userIDs: string[] = req.body;
+        const devices = await db.retrieveUserDeviceList(userIDs);
+        res.send(devices);
+    });
+
     api.get("/device/:id", async (req, res) => {
         const device = await db.retrieveDevice(req.params.id);
 

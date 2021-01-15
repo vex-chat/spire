@@ -39,7 +39,7 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
             return;
         }
 
-        const devices = await db.retrieveUserDeviceList(req.params.userID);
+        const devices = await db.retrieveUserDeviceList([req.params.userID]);
 
         let token: Uint8Array | null = null;
         for (const device of devices) {

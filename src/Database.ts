@@ -189,12 +189,12 @@ export class Database extends EventEmitter {
     }
 
     public async retrieveUserDeviceList(
-        userID: string
+        userIDs: string[]
     ): Promise<XTypes.SQL.IDevice[]> {
         return this.db
             .from("devices")
             .select()
-            .where({ owner: userID });
+            .whereIn("owner", userIDs);
     }
 
     public async getOTK(deviceID: string): Promise<XTypes.WS.IPreKeys | null> {

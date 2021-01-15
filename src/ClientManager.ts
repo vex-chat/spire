@@ -13,7 +13,7 @@ import {
 import winston from "winston";
 import WebSocket from "ws";
 
-import { Database, hashPassword } from "./Database";
+import { Database } from "./Database";
 import { censorUser, ICensoredUser } from "./server/utils";
 import { EXPIRY_TIME, ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
@@ -190,7 +190,7 @@ export class ClientManager extends EventEmitter {
     private async verifyResponse(msg: XTypes.WS.IRespMsg) {
         const user = await this.db.retrieveUser(this.jwtDetails.userID);
         if (user) {
-            const devices = await this.db.retrieveUserDeviceList(user.userID);
+            const devices = await this.db.retrieveUserDeviceList([user.userID]);
             let message: Uint8Array | null = null;
             for (const device of devices) {
                 const verified = nacl.sign.open(

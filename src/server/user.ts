@@ -30,7 +30,7 @@ export const getUserRouter = (
     });
 
     router.get("/:id/devices", async (req, res) => {
-        const deviceList = await db.retrieveUserDeviceList(req.params.id);
+        const deviceList = await db.retrieveUserDeviceList([req.params.id]);
         return res.send(deviceList);
     });
 
@@ -66,7 +66,7 @@ export const getUserRouter = (
             return;
         }
 
-        const userDevices = await db.retrieveUserDeviceList(userID);
+        const userDevices = await db.retrieveUserDeviceList([userID]);
         if (userDevices.length === 1) {
             log.warn("User can not delete the only device on their account.");
             res.status(400).send({

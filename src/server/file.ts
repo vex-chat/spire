@@ -62,7 +62,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
             return;
         }
 
-        const devices = await db.retrieveUserDeviceList(deviceEntry.owner);
+        const devices = await db.retrieveUserDeviceList([deviceEntry.owner]);
 
         let token: Uint8Array | null = null;
         for (const device of devices) {
