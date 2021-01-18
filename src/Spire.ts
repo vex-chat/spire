@@ -19,8 +19,8 @@ import { initApp } from "./server";
 import { censorUser, ICensoredUser } from "./server/utils";
 import { createLogger } from "./utils/createLogger";
 
-// expiry of regkeys
-export const EXPIRY_TIME = 1000 * 60 * 5;
+// expiry of regkeys = 24hr
+export const EXPIRY_TIME = 1000 * 60 * 60 * 24;
 
 // 3-19 chars long
 const usernameRegex = /^(\w{3,19})$/;
