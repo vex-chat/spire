@@ -371,7 +371,9 @@ export class Database extends EventEmitter {
         return users;
     }
 
-    public async retrievePermissionsByResourceID(resourceID: string) {
+    public async retrievePermissionsByResourceID(
+        resourceID: string
+    ): Promise<XTypes.SQL.IPermission[]> {
         return this.db
             .from("permissions")
             .select()

@@ -19,7 +19,8 @@ import { EXPIRY_TIME, ISpireOptions } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
 
-const POWER_LEVELS = {
+export const POWER_LEVELS = {
+    INVITE: 25,
     CREATE: 50,
     DELETE: 50,
 };
