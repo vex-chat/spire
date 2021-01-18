@@ -15,7 +15,7 @@ import WebSocket from "ws";
 
 import { Database } from "./Database";
 import { censorUser, ICensoredUser } from "./server/utils";
-import { EXPIRY_TIME, ISpireOptions } from "./Spire";
+import { ISpireOptions, TOKEN_EXPIRY } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
 
@@ -682,7 +682,7 @@ export class ClientManager extends EventEmitter {
                 if (!this.authed) {
                     this.conn.close();
                 }
-            }, EXPIRY_TIME);
+            }, TOKEN_EXPIRY);
             this.pingLoop();
         });
         this.conn.on("close", () => {

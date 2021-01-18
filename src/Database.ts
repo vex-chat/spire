@@ -269,6 +269,36 @@ export class Database extends EventEmitter {
         return permission;
     }
 
+    public async retrieveInvite(
+        inviteID: string
+    ): Promise<XTypes.SQL.IInvite | null> {
+        const rows = await this.db
+            .from("invites")
+            .select()
+            .where({ inviteID });
+        if (rows.length === 0) {
+            return null;
+        }
+        return rows[0];
+    }
+
+    public async createInvite(
+        inviteID: string,
+        serverID: string,
+        ownerID: string,
+        expiration: string
+    ): Promise<XTypes.SQL.IInvite> {
+        const invite: XTypes.SQL.IInvite = {
+            inviteID,
+            serverID,
+            owner: ownerID,
+            expiration,
+        };
+
+        await this.db("invites").insert(invite);
+        return invite;
+    }
+
     public async retrieveGroupMembers(
         channelID: string
     ): Promise<XTypes.SQL.IUser[]> {
@@ -649,6 +679,15 @@ export class Database extends EventEmitter {
     }
 
     private async init(): Promise<void> {
+        if (!(await this.db.schema.hasTable("invites"))) {
+            await this.db.schema.createTable("invites", (table) => {
+                table.string("inviteID").primary();
+                table.string("serverID").index();
+                table.string("owner");
+                table.string("expiration");
+            });
+        }
+
         if (!(await this.db.schema.hasTable("users"))) {
             await this.db.schema.createTable("users", (table) => {
                 table.string("userID").primary();

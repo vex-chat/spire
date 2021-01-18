@@ -15,10 +15,33 @@ import { Database } from "../Database";
 import jwt from "jsonwebtoken";
 import { getAvatarRouter } from "./avatar";
 import { getFileRouter } from "./file";
+import { getInviteRouter } from "./invite";
 import { getUserRouter } from "./user";
+import { ICensoredUser } from "./utils";
 
 // expiry of regkeys
 export const EXPIRY_TIME = 1000 * 60 * 5;
+
+const checkJwt = (req: any, res: any, next: () => void) => {
+    if (req.cookies.auth) {
+        try {
+            const result = jwt.verify(req.cookies.auth, process.env.SPK!);
+            // lol glad this is a try/catch block
+            (req as any).user = (result as any).user;
+        } catch (err) {
+            console.warn(err.toString());
+        }
+    }
+    next();
+};
+
+export const protect = (req: any, res: any, next: () => void) => {
+    if (!req.user) {
+        res.sendStatus(401);
+        return;
+    }
+    next();
+};
 
 // 3-19 chars long
 
@@ -34,29 +57,26 @@ export const initApp = (
     db: Database,
     log: winston.Logger,
     tokenValidator: (key: string, scope: XTypes.HTTP.TokenScopes) => boolean,
-    signKeys: nacl.SignKeyPair
+    signKeys: nacl.SignKeyPair,
+    notify: (
+        userID: string,
+        event: string,
+        transmissionID: string,
+        data?: any,
+        deviceID?: string
+    ) => void
 ) => {
     // INIT ROUTERS
     const userRouter = getUserRouter(db, log, tokenValidator);
     const fileRouter = getFileRouter(db, log);
     const avatarRouter = getAvatarRouter(db, log);
+    const inviteRouter = getInviteRouter(db, log, tokenValidator, notify);
 
     // MIDDLEWARE
     api.use(express.json({ limit: "20mb" }));
     api.use(helmet());
     api.use(cookieParser());
-    api.use((req, res, next) => {
-        if (req.cookies.auth) {
-            try {
-                const result = jwt.verify(req.cookies.auth, process.env.SPK!);
-                // lol glad this is a try/catch block
-                (req as any).user = (result as any).user;
-            } catch (err) {
-                console.warn(err.toString());
-            }
-        }
-        next();
-    });
+    api.use(checkJwt);
 
     if (!jestRun()) {
         api.use(morgan("dev", { stream: process.stdout }));
@@ -101,16 +121,14 @@ export const initApp = (
         }
     });
 
-    api.get("/canary", async (req, res) => {
-        res.send({ canary: process.env.CANARY });
-    });
-
     // COMPLEX RESOURCES
     api.use("/user", userRouter);
 
     api.use("/file", fileRouter);
 
     api.use("/avatar", avatarRouter);
+
+    api.use("/invite", inviteRouter);
 };
 
 /**

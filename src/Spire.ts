@@ -20,7 +20,8 @@ import { censorUser, ICensoredUser } from "./server/utils";
 import { createLogger } from "./utils/createLogger";
 
 // expiry of regkeys = 24hr
-export const EXPIRY_TIME = 1000 * 60 * 60 * 24;
+export const TOKEN_EXPIRY = 1000 * 60 * 10;
+export const JWT_EXPIRY = 1000 * 60 * 60 * 24;
 
 // 3-19 chars long
 const usernameRegex = /^(\w{3,19})$/;
@@ -157,17 +158,17 @@ export class Spire extends EventEmitter {
 
                 const age =
                     new Date(Date.now()).getTime() - rKey.time.getTime();
-                this.log.info("Regkey found, " + age + " ms old.");
-                if (age < EXPIRY_TIME) {
-                    this.log.info("Regkey is valid.");
+                this.log.info("Token found, " + age + " ms old.");
+                if (age < TOKEN_EXPIRY) {
+                    this.log.info("Token is valid.");
                     this.deleteActionToken(rKey);
                     return true;
                 } else {
-                    this.log.info("Regkey is expired.");
+                    this.log.info("Token is expired.");
                 }
             }
         }
-        this.log.info("Regkey not found.");
+        this.log.info("Token not found.");
         return false;
     }
 
@@ -178,7 +179,8 @@ export class Spire extends EventEmitter {
             this.db,
             this.log,
             this.validateToken.bind(this),
-            this.signKeys
+            this.signKeys,
+            this.notify.bind(this)
         );
 
         // All the app logic strongly coupled to spire class :/
@@ -231,9 +233,18 @@ export class Spire extends EventEmitter {
         });
 
         this.api.get("/token/:tokenType", async (req, res) => {
-            const allowedTokens = ["file", "register", "avatar", "device"];
+            const allowedTokens = [
+                "file",
+                "register",
+                "avatar",
+                "device",
+                "invite",
+            ];
 
             const { tokenType } = req.params;
+
+            console.log(tokenType);
+
             if (!allowedTokens.includes(tokenType)) {
                 res.sendStatus(400);
                 return;
@@ -254,8 +265,11 @@ export class Spire extends EventEmitter {
                 case "device":
                     scope = TokenScopes.Device;
                     break;
+                case "invite":
+                    scope = TokenScopes.Invite;
+                    break;
                 default:
-                    res.sendStatus(500);
+                    res.sendStatus(400);
                     return;
             }
 
@@ -266,11 +280,11 @@ export class Spire extends EventEmitter {
 
                 setTimeout(() => {
                     this.deleteActionToken(token);
-                }, EXPIRY_TIME);
+                }, TOKEN_EXPIRY);
 
                 return res.status(201).send(token);
             } catch (err) {
-                this.log.error(err.toString());
+                console.error(err.toString());
                 return res.sendStatus(500);
             }
         });
@@ -313,11 +327,10 @@ export class Spire extends EventEmitter {
                     return;
                 }
 
-                // TODO: set a cookie here and use it for WS
                 const token = jwt.sign(
                     { user: censorUser(userEntry) },
                     process.env.SPK!,
-                    { expiresIn: EXPIRY_TIME }
+                    { expiresIn: JWT_EXPIRY }
                 );
                 res.cookie("auth", token);
                 res.send({ user: censorUser(userEntry), token });
@@ -335,7 +348,7 @@ export class Spire extends EventEmitter {
 
                 setTimeout(() => {
                     this.deleteActionToken(regKey);
-                }, EXPIRY_TIME);
+                }, TOKEN_EXPIRY);
 
                 return res.status(201).send(regKey);
             } catch (err) {
