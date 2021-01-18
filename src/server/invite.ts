@@ -132,7 +132,7 @@ export const getInviteRouter = (
                 jwtDetails.userID,
                 expires.toString()
             );
-            res.send({ invite });
+            res.send(invite);
         } else {
             log.warn("Invalid token!");
             res.sendStatus(401);
