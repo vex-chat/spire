@@ -327,53 +327,6 @@ export class ClientManager extends EventEmitter {
                         break;
                     }
                 }
-                if (msg.action === "CREATE") {
-                    try {
-                        const { resourceType, userID, resourceID } = msg.data;
-                        const userHeldPerms = await this.db.retrievePermissions(
-                            this.getUser().userID,
-                            "all"
-                        );
-                        let found = false;
-                        for (const perm of userHeldPerms) {
-                            if (perm.resourceID === resourceID) {
-                                if (perm.powerLevel > POWER_LEVELS.CREATE) {
-                                    // he's got the perm and the power level, we're good to go
-                                    const newPerm = await this.db.createPermission(
-                                        userID,
-                                        resourceType,
-                                        resourceID,
-                                        0
-                                    );
-                                    this.sendSuccess(
-                                        msg.transmissionID,
-                                        newPerm
-                                    );
-                                    // notify the user of their new permission
-                                    this.notify(
-                                        userID,
-                                        "permission",
-                                        msg.transmissionID,
-                                        newPerm
-                                    );
-                                    found = true;
-
-                                    break;
-                                }
-                            }
-                        }
-                        if (!found) {
-                            this.sendErr(
-                                msg.transmissionID,
-                                "You don't have permission for that."
-                            );
-                        }
-                        break;
-                    } catch (err) {
-                        this.sendErr(msg.transmissionID, err.toString());
-                    }
-                }
-                break;
             case "otk":
                 if (msg.action === "RETRIEVE") {
                     try {
