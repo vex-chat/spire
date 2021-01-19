@@ -282,6 +282,15 @@ export class Database extends EventEmitter {
         return rows[0];
     }
 
+    public async retrieveServerInvites(
+        serverID: string
+    ): Promise<XTypes.SQL.IInvite[]> {
+        return this.db
+            .from("invites")
+            .select()
+            .where({ serverID });
+    }
+
     public async createInvite(
         inviteID: string,
         serverID: string,
