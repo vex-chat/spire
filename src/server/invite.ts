@@ -55,6 +55,15 @@ export const getInviteRouter = (
         notify(jwtDetails.userID, "permission", uuid.v4(), permission);
     });
 
+    router.put("/:inviteID", async (req, res) => {
+        const invite = await db.retrieveInvite(req.params.inviteID);
+        if (!invite) {
+            res.sendStatus(404);
+            return;
+        }
+        res.send(invite);
+    });
+
     router.get("/:serverID", protect, async (req, res) => {
         const jwtDetails: ICensoredUser = (req as any).user;
 
@@ -81,7 +90,7 @@ export const getInviteRouter = (
         res.send(
             inviteList.filter((invite) => {
                 return (
-                    new Date(Date.now()).getTime() >
+                    new Date(Date.now()).getTime() <
                     new Date(invite.expiration).getTime()
                 );
             })
