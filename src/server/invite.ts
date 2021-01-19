@@ -39,7 +39,6 @@ export const getInviteRouter = (
     const router = express.Router();
     router.patch("/:inviteID", protect, async (req, res) => {
         const jwtDetails: ICensoredUser = (req as any).user;
-        console.log(req.params.inviteID);
 
         const invite = await db.retrieveInvite(req.params.inviteID);
         if (!invite) {
@@ -56,6 +55,39 @@ export const getInviteRouter = (
         notify(jwtDetails.userID, "permission", uuid.v4(), permission);
     });
 
+    router.get("/:serverID", protect, async (req, res) => {
+        const jwtDetails: ICensoredUser = (req as any).user;
+
+        const permissions = await db.retrievePermissions(
+            jwtDetails.userID,
+            "server"
+        );
+
+        let hasPermission = false;
+        for (const permission of permissions) {
+            if (
+                permission.resourceID === req.params.serverID &&
+                permission.powerLevel > POWER_LEVELS.INVITE
+            ) {
+                hasPermission = true;
+            }
+        }
+        if (!hasPermission) {
+            res.sendStatus(401);
+            return;
+        }
+
+        const inviteList = await db.retrieveServerInvites(req.params.serverID);
+        res.send(
+            inviteList.filter((invite) => {
+                return (
+                    new Date(Date.now()).getTime() >
+                    new Date(invite.expiration).getTime()
+                );
+            })
+        );
+    });
+
     router.post("/:serverID", protect, async (req, res) => {
         const jwtDetails: ICensoredUser = (req as any).user;
 
@@ -67,22 +99,22 @@ export const getInviteRouter = (
             return;
         }
 
-        const permissions = await db.retrievePermissionsByResourceID(
-            req.params.serverID
+        const permissions = await db.retrievePermissions(
+            jwtDetails.userID,
+            "server"
         );
 
-        let hasPerm = false;
+        let hasPermission = false;
         for (const permission of permissions) {
             if (
-                permission.userID === jwtDetails.userID &&
                 permission.resourceID === req.params.serverID &&
                 permission.powerLevel > POWER_LEVELS.INVITE
             ) {
-                hasPerm = true;
+                hasPermission = true;
             }
         }
 
-        if (!hasPerm) {
+        if (!hasPermission) {
             log.warn("No permission!");
             res.sendStatus(401);
             return;
