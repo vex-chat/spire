@@ -46,6 +46,12 @@ export const getInviteRouter = (
             res.sendStatus(404);
             return;
         }
+
+        if (new Date(invite.expiration).getTime() < Date.now()) {
+            res.sendStatus(401);
+            return;
+        }
+
         const permission = await db.createPermission(
             jwtDetails.userID,
             "server",
