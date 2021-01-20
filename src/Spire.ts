@@ -243,8 +243,6 @@ export class Spire extends EventEmitter {
 
             const { tokenType } = req.params;
 
-            console.log(tokenType);
-
             if (!allowedTokens.includes(tokenType)) {
                 res.sendStatus(400);
                 return;
