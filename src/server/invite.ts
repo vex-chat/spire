@@ -95,10 +95,15 @@ export const getInviteRouter = (
         const inviteList = await db.retrieveServerInvites(req.params.serverID);
         res.send(
             inviteList.filter((invite) => {
-                return (
+                const valid =
                     new Date(Date.now()).getTime() <
-                    new Date(invite.expiration).getTime()
-                );
+                    new Date(invite.expiration).getTime();
+
+                if (!valid) {
+                    db.deleteInvite(invite.inviteID);
+                }
+
+                return valid;
             })
         );
     });

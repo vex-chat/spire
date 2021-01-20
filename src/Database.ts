@@ -291,6 +291,13 @@ export class Database extends EventEmitter {
             .where({ serverID });
     }
 
+    public async deleteInvite(inviteID: string): Promise<void> {
+        await this.db
+            .from("invites")
+            .where({ inviteID })
+            .delete();
+    }
+
     public async createInvite(
         inviteID: string,
         serverID: string,
