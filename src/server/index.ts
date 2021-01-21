@@ -177,7 +177,7 @@ export const initApp = (
             return;
         }
 
-        if (Buffer.byteLength(req.file.buffer) > 128000) {
+        if (Buffer.byteLength(req.file.buffer) > 256000) {
             console.warn("File to big.");
             res.sendStatus(413);
         }
