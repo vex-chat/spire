@@ -26,7 +26,7 @@ export const JWT_EXPIRY = 1000 * 60 * 60 * 24;
 // 3-19 chars long
 const usernameRegex = /^(\w{3,19})$/;
 
-const directories = ["files", "avatars"];
+const directories = ["files", "avatars", "emoji"];
 for (const dir of directories) {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir);
@@ -239,6 +239,7 @@ export class Spire extends EventEmitter {
                 "avatar",
                 "device",
                 "invite",
+                "emoji",
             ];
 
             const { tokenType } = req.params;
@@ -265,6 +266,9 @@ export class Spire extends EventEmitter {
                     break;
                 case "invite":
                     scope = TokenScopes.Invite;
+                    break;
+                case "emoji":
+                    scope = TokenScopes.Emoji;
                     break;
                 default:
                     res.sendStatus(400);

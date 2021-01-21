@@ -10,7 +10,6 @@ import { v4 } from "uuid";
 import winston from "winston";
 
 import { Database } from "../Database";
-import { protect } from ".";
 
 export const getFileRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
@@ -49,7 +48,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         }
     });
 
-    router.post("/json", protect, async (req, res) => {
+    router.post("/json", async (req, res) => {
         const payload: XTypes.HTTP.IFilePayload = req.body;
 
         if (payload.nonce === "") {

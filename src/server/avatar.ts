@@ -1,5 +1,4 @@
 import fs from "fs";
-import path from "path";
 
 import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
@@ -10,7 +9,6 @@ import nacl from "tweetnacl";
 import winston from "winston";
 
 import { Database } from "../Database";
-import { protect } from ".";
 
 export const getAvatarRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
@@ -36,7 +34,7 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
         stream2.pipe(res);
     });
 
-    router.post("/:userID/json", protect, async (req, res) => {
+    router.post("/:userID/json", async (req, res) => {
         const payload: XTypes.HTTP.IFilePayload = req.body;
         const userEntry = await db.retrieveUser(req.params.userID);
         console.log("REQ.BODY", JSON.stringify(payload));

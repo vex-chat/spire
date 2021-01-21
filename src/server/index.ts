@@ -12,12 +12,17 @@ import winston from "winston";
 
 import { Database } from "../Database";
 
+import { XUtils } from "@vex-chat/crypto";
+import FileType from "file-type";
 import jwt from "jsonwebtoken";
+import multer from "multer";
+import nacl from "tweetnacl";
 import { getAvatarRouter } from "./avatar";
 import { getFileRouter } from "./file";
 import { getInviteRouter } from "./invite";
 import { getUserRouter } from "./user";
-import { ICensoredUser } from "./utils";
+
+import * as uuid from "uuid";
 
 // expiry of regkeys
 export const EXPIRY_TIME = 1000 * 60 * 5;
@@ -118,6 +123,113 @@ export const initApp = (
             return res.send(device);
         } else {
             res.sendStatus(404);
+        }
+    });
+
+    interface IEmojiPayload {
+        signed: string;
+        name: string;
+        file?: string;
+    }
+
+    api.get("/emoji/:emojiID/details", async (req, res) => {
+        const emoji = await db.retrieveEmoji(req.params.emojiID);
+        res.send(emoji);
+    });
+
+    api.get("/emoji/:emojiID", async (req, res) => {
+        const stream = fs.createReadStream("./emoji/" + req.params.emojiID);
+        stream.on("error", (err) => {
+            // log.error(err.toString());
+            res.sendStatus(404);
+        });
+
+        const typeDetails = await FileType.fromStream(stream);
+        if (typeDetails) {
+            res.set("Content-type", typeDetails.mime);
+        }
+
+        res.set("Cache-control", "public, max-age=31536000");
+        const stream2 = fs.createReadStream("./emoji/" + req.params.emojiID);
+        stream2.on("error", (err) => {
+            log.error(err.toString());
+            res.sendStatus(500);
+        });
+        stream2.pipe(res);
+    });
+
+    api.post("/emoji/:userID", multer().single("emoji"), async (req, res) => {
+        const payload: IEmojiPayload = req.body;
+        const userEntry = await db.retrieveUser(req.params.userID);
+
+        if (!userEntry) {
+            res.sendStatus(404);
+            return;
+        }
+
+        if (!payload.name) {
+            res.sendStatus(400);
+        }
+
+        if (!req.file) {
+            console.warn("MISSING FILE");
+            res.sendStatus(400);
+            return;
+        }
+
+        const devices = await db.retrieveUserDeviceList([req.params.userID]);
+        const mimeType = await FileType.fromBuffer(req.file.buffer);
+
+        const allowedTypes = [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/apng",
+            "image/avif",
+        ];
+
+        if (!allowedTypes.includes(mimeType?.mime || "no/type")) {
+            res.status(400).send({
+                error:
+                    "Unsupported file type. Expected jpeg, png, gif, apng, or avif but received " +
+                    mimeType?.ext,
+            });
+            return;
+        }
+
+        let token: Uint8Array | null = null;
+        for (const device of devices) {
+            const verified = nacl.sign.open(
+                XUtils.decodeHex(payload.signed),
+                XUtils.decodeHex(device.signKey)
+            );
+            if (verified) {
+                token = verified;
+            }
+        }
+        if (!token) {
+            log.warn("Bad signature on token.");
+            res.sendStatus(401);
+            return;
+        }
+
+        const emoji: XTypes.SQL.IEmoji = {
+            emojiID: uuid.v4(),
+            owner: userEntry.userID,
+            name: payload.name,
+        };
+
+        await db.createEmoji(emoji);
+
+        try {
+            // write the file to disk
+            fs.writeFile("emoji/" + emoji.emojiID, req.file.buffer, () => {
+                log.info("Wrote new emoji " + emoji.emojiID);
+            });
+            res.send(emoji);
+        } catch (err) {
+            log.warn(err);
+            res.sendStatus(500);
         }
     });
 

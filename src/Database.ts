@@ -1,4 +1,3 @@
-import { sleep } from "@extrahash/sleep";
 import { xMakeNonce, XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import { EventEmitter } from "events";
@@ -500,6 +499,39 @@ export class Database extends EventEmitter {
             .delete();
     }
 
+    public async createEmoji(emoji: XTypes.SQL.IEmoji): Promise<void> {
+        await this.db("emojis").insert(emoji);
+    }
+
+    public async deleteEmoji(emojiID: string): Promise<void> {
+        await this.db
+            .from("emojis")
+            .where({ emojiID })
+            .del();
+    }
+
+    public async retrieveEmojiList(
+        userID: string
+    ): Promise<XTypes.SQL.IEmoji[]> {
+        return this.db
+            .from("emojis")
+            .select()
+            .where({ owner: userID });
+    }
+
+    public async retrieveEmoji(
+        emojiID: string
+    ): Promise<XTypes.SQL.IEmoji | null> {
+        const rows = await this.db
+            .from("emojis")
+            .select()
+            .where({ emojiID });
+        if (rows.length === 0) {
+            return null;
+        }
+        return rows[0];
+    }
+
     public async deleteServer(serverID: string): Promise<void> {
         await this.deletePermissions(serverID);
         const channels = await this.retrieveChannels(serverID);
@@ -788,6 +820,14 @@ export class Database extends EventEmitter {
                 table.string("fileID").primary();
                 table.string("owner").index();
                 table.string("nonce");
+            });
+        }
+
+        if (!(await this.db.schema.hasTable("emojis"))) {
+            await this.db.schema.createTable("emojis", (table) => {
+                table.string("emojiID").primary();
+                table.string("owner").index();
+                table.string("name");
             });
         }
 
