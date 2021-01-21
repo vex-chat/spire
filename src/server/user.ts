@@ -35,7 +35,7 @@ export const getUserRouter = (
     });
 
     router.get("/:userID/emoji", async (req, res) => {
-        const rows = await db.retrieveEmoji(req.params.userID);
+        const rows = await db.retrieveEmojiList(req.params.userID);
         res.send(rows);
     });
 

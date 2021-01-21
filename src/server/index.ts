@@ -177,6 +177,11 @@ export const initApp = (
             return;
         }
 
+        if (Buffer.byteLength(req.file.buffer) > 128000) {
+            console.warn("File to big.");
+            res.sendStatus(413);
+        }
+
         const devices = await db.retrieveUserDeviceList([req.params.userID]);
         const mimeType = await FileType.fromBuffer(req.file.buffer);
 
