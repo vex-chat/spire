@@ -252,7 +252,8 @@ export class ClientManager extends EventEmitter {
     private sendSuccess(
         transmissionID: string,
         data: any,
-        header?: Uint8Array
+        header?: Uint8Array,
+        timestamp?: string
     ) {
         const msg: XTypes.WS.ISucessMsg = {
             transmissionID,
@@ -436,11 +437,12 @@ export class ClientManager extends EventEmitter {
                             this.getDevice().deviceID
                         );
                         for (const mail of inbox) {
-                            const [mailHeader, mailBody] = mail;
+                            const [mailHeader, mailBody, timestamp] = mail;
                             this.sendSuccess(
                                 msg.transmissionID,
                                 mailBody,
-                                mailHeader
+                                mailHeader,
+                                timestamp.toString()
                             );
                         }
                         this.sendSuccess(msg.transmissionID, null);

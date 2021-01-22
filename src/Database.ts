@@ -667,15 +667,15 @@ export class Database extends EventEmitter {
     public async retrieveMail(
         deviceID: string
         // tslint:disable-next-line: array-type
-    ): Promise<[Uint8Array, XTypes.WS.IMail][]> {
+    ): Promise<[Uint8Array, XTypes.WS.IMail, Date][]> {
         const rows: XTypes.SQL.IMail[] = await this.db
             .from("mail")
             .select()
             .where({ recipient: deviceID });
 
-        const mapFunc: (
+        const fixMail: (
             mail: XTypes.SQL.IMail
-        ) => [Uint8Array, XTypes.WS.IMail] = (mail) => {
+        ) => [Uint8Array, XTypes.WS.IMail, Date] = (mail) => {
             const msgb: XTypes.WS.IMail = {
                 mailType: mail.mailType,
                 mailID: mail.mailID,
@@ -690,10 +690,10 @@ export class Database extends EventEmitter {
                 readerID: mail.readerID,
             };
             const msgh = XUtils.decodeHex(mail.header);
-            return [msgh, msgb];
+            return [msgh, msgb, new Date(mail.time)];
         };
 
-        const allMail = rows.map(mapFunc);
+        const allMail = rows.map(fixMail);
 
         return allMail;
     }
