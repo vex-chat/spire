@@ -5,10 +5,10 @@ import jwt from "jsonwebtoken";
 import nacl from "tweetnacl";
 import { stringify } from "uuid";
 import winston from "winston";
-import { EXPIRY_TIME } from ".";
+import { EXPIRY_TIME, protect } from ".";
 
 import { Database, hashPassword } from "../Database";
-import { censorUser } from "./utils";
+import { censorUser, ICensoredUser } from "./utils";
 
 const TokenScopes = XTypes.HTTP.TokenScopes;
 
@@ -39,48 +39,27 @@ export const getUserRouter = (
         res.send(rows);
     });
 
-    router.delete("/:userID/devices/:deviceID", async (req, res) => {
-        const { userID, deviceID } = req.params;
-        const { password } = req.body;
+    router.delete("/:userID/devices/:deviceID", protect, async (req, res) => {
+        const device = await db.retrieveDevice(req.params.deviceID);
 
-        if (typeof password !== "string") {
-            res.status(400).send("Password must be a string.");
-        }
-
-        const userEntry = await db.retrieveUser(userID);
-
-        if (!userEntry) {
-            log.warn("This user doesn't exist.");
+        if (!device) {
             res.sendStatus(404);
             return;
         }
-
-        const salt = XUtils.decodeHex(userEntry.passwordSalt);
-        const payloadHash = XUtils.encodeHex(hashPassword(password, salt));
-
-        if (payloadHash !== userEntry.passwordHash) {
+        const jwtDetails = (req as any).user as ICensoredUser;
+        if (jwtDetails.userID !== device.owner) {
             res.sendStatus(401);
-            log.info("Wrong password.");
-        }
-
-        const deviceEntry = await db.retrieveDevice(deviceID);
-
-        if (!deviceEntry) {
-            log.warn("This device doesn't exist.");
-            res.sendStatus(404);
             return;
         }
-
-        const userDevices = await db.retrieveUserDeviceList([userID]);
-        if (userDevices.length === 1) {
-            log.warn("User can not delete the only device on their account.");
+        const deviceList = await db.retrieveUserDeviceList([jwtDetails.userID]);
+        if (deviceList.length === 1) {
             res.status(400).send({
-                error: "You must have at least one device on your account.",
+                error: "You can't delete your last device.",
             });
             return;
         }
 
-        db.deleteDevice(deviceID);
+        await db.deleteDevice(device.deviceID);
         res.sendStatus(200);
     });
 

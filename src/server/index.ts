@@ -43,7 +43,7 @@ const checkJwt = (req: any, res: any, next: () => void) => {
 export const protect = (req: any, res: any, next: () => void) => {
     if (!req.user) {
         res.sendStatus(401);
-        return;
+        throw new Error("not authenticated!");
     }
     next();
 };

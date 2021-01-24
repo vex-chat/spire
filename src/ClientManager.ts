@@ -259,6 +259,7 @@ export class ClientManager extends EventEmitter {
             transmissionID,
             type: "success",
             data,
+            timestamp,
         };
         this.send(msg, header);
     }
@@ -268,8 +269,57 @@ export class ClientManager extends EventEmitter {
         header: Uint8Array
     ) {
         switch (msg.resourceType) {
+            case "permissionList":
+                if (msg.action === "RETRIEVE") {
+                    try {
+                        const permissions = await this.db.retrievePermissionsByResourceID(
+                            msg.data
+                        );
+                        if (permissions) {
+                            let found = false;
+                            for (const perm of permissions) {
+                                if (perm.userID === this.getUser().userID) {
+                                    this.sendSuccess(
+                                        msg.transmissionID,
+                                        permissions
+                                    );
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) {
+                                this.sendErr(
+                                    msg.transmissionID,
+                                    "You don't have permission to do that."
+                                );
+                            }
+                            break;
+                        } else {
+                            this.sendErr(
+                                msg.transmissionID,
+                                "That doesn't exist."
+                            );
+                            break;
+                        }
+                    } catch (err) {
+                        this.sendErr(msg.transmissionID, err.toString());
+                    }
+                }
+                break;
             case "permissions":
                 if (msg.action === "RETRIEVE") {
+                    try {
+                        const permissions = await this.db.retrievePermissions(
+                            this.getUser().userID,
+                            "all"
+                        );
+                        this.sendSuccess(msg.transmissionID, permissions);
+                        break;
+                    } catch (err) {
+                        this.sendErr(msg.transmissionID, err.toString());
+                    }
+                }
+                if (msg.action === "SERVERLIST") {
                     try {
                         const permissions = await this.db.retrievePermissions(
                             this.getUser().userID,
@@ -310,7 +360,9 @@ export class ClientManager extends EventEmitter {
                                         perm.powerLevel >
                                             permToDelete.powerLevel))
                             ) {
-                                this.db.deletePermission(perm.permissionID);
+                                this.db.deletePermission(
+                                    permToDelete.permissionID
+                                );
                                 this.sendSuccess(msg.transmissionID, null);
                                 found = true;
                                 break;
@@ -328,6 +380,7 @@ export class ClientManager extends EventEmitter {
                         break;
                     }
                 }
+                break;
             case "otk":
                 if (msg.action === "RETRIEVE") {
                     try {
@@ -438,6 +491,7 @@ export class ClientManager extends EventEmitter {
                         );
                         for (const mail of inbox) {
                             const [mailHeader, mailBody, timestamp] = mail;
+                            console.log("TIMESTAMP", timestamp.toString());
                             this.sendSuccess(
                                 msg.transmissionID,
                                 mailBody,

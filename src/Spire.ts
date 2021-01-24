@@ -21,7 +21,7 @@ import { createLogger } from "./utils/createLogger";
 
 // expiry of regkeys = 24hr
 export const TOKEN_EXPIRY = 1000 * 60 * 10;
-export const JWT_EXPIRY = 1000 * 60 * 60 * 24;
+export const JWT_EXPIRY = "7d";
 
 // 3-19 chars long
 const usernameRegex = /^(\w{3,19})$/;
@@ -289,6 +289,10 @@ export class Spire extends EventEmitter {
                 console.error(err.toString());
                 return res.sendStatus(500);
             }
+        });
+
+        this.api.post("/whoami", async (req, res) => {
+            res.send(JSON.stringify((req as any).user));
         });
 
         this.api.post("/auth", async (req, res) => {

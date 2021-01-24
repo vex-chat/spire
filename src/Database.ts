@@ -689,6 +689,7 @@ export class Database extends EventEmitter {
                 authorID: mail.authorID,
                 readerID: mail.readerID,
             };
+
             const msgh = XUtils.decodeHex(mail.header);
             return [msgh, msgb, new Date(mail.time)];
         };
