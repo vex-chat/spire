@@ -153,6 +153,16 @@ export class Database extends EventEmitter {
     }
 
     public async deleteDevice(deviceID: string): Promise<void> {
+        await this.db
+            .from("preKeys")
+            .where({ deviceID })
+            .del();
+
+        await this.db
+            .from("oneTimeKeys")
+            .where({ deviceID })
+            .del();
+
         return this.db
             .from("devices")
             .where({ deviceID })
