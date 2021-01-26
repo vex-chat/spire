@@ -311,7 +311,7 @@ export class Spire extends EventEmitter {
                 process.env.SPK!,
                 { expiresIn: -1 }
             );
-            res.cookie("auth", token, { domain: ".api.vex.chat", path: "/" });
+            res.cookie("auth", token, { path: "/" });
             res.sendStatus(200);
         });
 
@@ -358,31 +358,14 @@ export class Spire extends EventEmitter {
                     process.env.SPK!,
                     { expiresIn: JWT_EXPIRY }
                 );
-                res.cookie("auth", token, {
-                    domain: ".api.vex.chat",
-                    path: "/",
-                });
+
+                const test = jwt.verify(token, process.env.SPK!);
+
+                res.cookie("auth", token, { path: "/" });
                 res.send({ user: censorUser(userEntry), token });
             } catch (err) {
                 console.log(err.toString());
                 res.sendStatus(500);
-            }
-        });
-
-        this.api.post("/register/key", (req, res) => {
-            try {
-                this.log.info("New regkey requested.");
-                const regKey = this.createActionToken(TokenScopes.Register);
-                this.log.info("New regkey created: " + regKey.key);
-
-                setTimeout(() => {
-                    this.deleteActionToken(regKey);
-                }, TOKEN_EXPIRY);
-
-                return res.status(201).send(regKey);
-            } catch (err) {
-                this.log.error(err.toString());
-                return res.sendStatus(500);
             }
         });
 
