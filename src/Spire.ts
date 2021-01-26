@@ -371,6 +371,7 @@ export class Spire extends EventEmitter {
 
         // 19 char max limit for username
         this.api.post("/register/new", async (req, res) => {
+            this.log.info("REACHED REGISTER ENDPOINT");
             try {
                 const regPayload: XTypes.HTTP.IRegistrationPayload = req.body;
 
