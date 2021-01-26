@@ -63,7 +63,7 @@ export const getUserRouter = (
         res.sendStatus(200);
     });
 
-    router.post("/:id/devices", async (req, res) => {
+    router.post("/:id/devices", protect, async (req, res) => {
         const devicePayload: XTypes.HTTP.IDevicePayload = req.body;
 
         const userEntry = await db.retrieveUser(req.params.id);
@@ -71,16 +71,6 @@ export const getUserRouter = (
         if (!userEntry) {
             res.sendStatus(404);
             log.warn("User does not exist.");
-            return;
-        }
-
-        const salt = XUtils.decodeHex(userEntry.passwordSalt);
-        const payloadHash = XUtils.encodeHex(
-            hashPassword(devicePayload.password, salt)
-        );
-
-        if (payloadHash !== userEntry.passwordHash) {
-            res.sendStatus(401);
             return;
         }
 

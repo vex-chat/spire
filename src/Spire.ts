@@ -15,7 +15,7 @@ import WebSocket from "ws";
 import jwt from "jsonwebtoken";
 import { ClientManager } from "./ClientManager";
 import { Database, hashPassword } from "./Database";
-import { initApp } from "./server";
+import { initApp, protect } from "./server";
 import { censorUser, ICensoredUser } from "./server/utils";
 import { createLogger } from "./utils/createLogger";
 
@@ -292,7 +292,27 @@ export class Spire extends EventEmitter {
         });
 
         this.api.post("/whoami", async (req, res) => {
-            res.send(JSON.stringify((req as any).user));
+            if (!(req as any).user) {
+                console.log("NO USER!");
+                res.sendStatus(401);
+                return;
+            }
+
+            res.send({
+                user: (req as any).user,
+                exp: (req as any).exp,
+                token: req.cookies.auth,
+            });
+        });
+
+        this.api.post("/goodbye", protect, async (req, res) => {
+            const token = jwt.sign(
+                { user: censorUser((req as any).user) },
+                process.env.SPK!,
+                { expiresIn: -1 }
+            );
+            res.cookie("auth", token, { domain: ".api.vex.chat", path: "/" });
+            res.sendStatus(200);
         });
 
         this.api.post("/auth", async (req, res) => {
@@ -338,7 +358,10 @@ export class Spire extends EventEmitter {
                     process.env.SPK!,
                     { expiresIn: JWT_EXPIRY }
                 );
-                res.cookie("auth", token);
+                res.cookie("auth", token, {
+                    domain: ".api.vex.chat",
+                    path: "/",
+                });
                 res.send({ user: censorUser(userEntry), token });
             } catch (err) {
                 console.log(err.toString());
@@ -366,7 +389,7 @@ export class Spire extends EventEmitter {
         // 19 char max limit for username
         this.api.post("/register/new", async (req, res) => {
             try {
-                const regPayload: XTypes.HTTP.IDevicePayload = req.body;
+                const regPayload: XTypes.HTTP.IRegistrationPayload = req.body;
 
                 if (!usernameRegex.test(regPayload.username)) {
                     res.status(400).send({

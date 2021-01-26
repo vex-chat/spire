@@ -573,7 +573,7 @@ export class Database extends EventEmitter {
 
     public async createUser(
         regKey: Uint8Array,
-        regPayload: XTypes.HTTP.IDevicePayload
+        regPayload: XTypes.HTTP.IRegistrationPayload
     ): Promise<[XTypes.SQL.IUser | null, Error | null]> {
         try {
             const salt = xMakeNonce();

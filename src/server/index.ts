@@ -23,6 +23,8 @@ import { getInviteRouter } from "./invite";
 import { getUserRouter } from "./user";
 
 import * as uuid from "uuid";
+import { JWT_EXPIRY } from "../Spire";
+import { censorUser } from "./utils";
 
 // expiry of regkeys
 export const EXPIRY_TIME = 1000 * 60 * 5;
@@ -31,8 +33,10 @@ const checkJwt = (req: any, res: any, next: () => void) => {
     if (req.cookies.auth) {
         try {
             const result = jwt.verify(req.cookies.auth, process.env.SPK!);
+
             // lol glad this is a try/catch block
             (req as any).user = (result as any).user;
+            (req as any).exp = (result as any).exp;
         } catch (err) {
             console.warn(err.toString());
         }
@@ -45,10 +49,9 @@ export const protect = (req: any, res: any, next: () => void) => {
         res.sendStatus(401);
         throw new Error("not authenticated!");
     }
+
     next();
 };
-
-// 3-19 chars long
 
 const directories = ["files", "avatars"];
 for (const dir of directories) {
