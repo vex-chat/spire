@@ -130,14 +130,7 @@ export class Database extends EventEmitter {
             deleted: false,
         };
 
-        try {
-            await this.db("devices").insert(device);
-        } catch (err) {
-            if (err.errno !== 19) {
-                throw err;
-            }
-            this.log.warn("Attempted to insert duplicate deviceID.");
-        }
+        await this.db("devices").insert(device);
 
         const medPreKeys: XTypes.SQL.IPreKeys = {
             keyID: uuid.v4(),
@@ -178,6 +171,7 @@ export class Database extends EventEmitter {
                 .from("devices")
                 .select()
                 .where({ deviceID, deleted: false });
+
             if (rows.length === 0) {
                 return null;
             }
@@ -188,7 +182,7 @@ export class Database extends EventEmitter {
             const rows = await this.db
                 .from("devices")
                 .select()
-                .where({ signKey: deviceID });
+                .where({ signKey: deviceID, deleted: false });
             if (rows.length === 0) {
                 return null;
             }
@@ -749,6 +743,7 @@ export class Database extends EventEmitter {
                 table.string("owner");
                 table.string("name");
                 table.string("lastLogin");
+                table.boolean("deleted");
             });
         }
         if (!(await this.db.schema.hasTable("mail"))) {

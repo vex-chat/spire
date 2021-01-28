@@ -86,11 +86,18 @@ export const getUserRouter = (
         }
 
         if (tokenValidator(stringify(token), TokenScopes.Device)) {
-            const device = await db.createDevice(
-                userEntry.userID,
-                devicePayload
-            );
-            res.send(device);
+            try {
+                const device = await db.createDevice(
+                    userEntry.userID,
+                    devicePayload
+                );
+                res.send(device);
+            } catch (err) {
+                console.warn(err);
+                // failed registration due to signkey being taken
+                res.sendStatus(470);
+                return;
+            }
         } else {
             res.sendStatus(401);
         }

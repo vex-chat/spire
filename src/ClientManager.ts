@@ -133,6 +133,7 @@ export class ClientManager extends EventEmitter {
     private authorize(transmissionID: string) {
         this.authed = true;
         this.sendAuthedMessage(transmissionID);
+        this.db.markDeviceLogin(this.getDevice());
         this.emit("authed");
     }
 
@@ -149,8 +150,8 @@ export class ClientManager extends EventEmitter {
         if (this.failed) {
             return;
         }
-        this.log.warn("Connection closed.");
         if (this.conn) {
+            this.log.warn("Connection closed.");
             this.conn.close();
         }
         this.failed = true;
@@ -198,29 +199,29 @@ export class ClientManager extends EventEmitter {
                     msg.signed,
                     XUtils.decodeHex(device.signKey)
                 );
-
                 if (verified) {
                     message = verified;
                     this.device = device;
                 }
             }
             if (!message) {
-                console.warn("Bad response from client.");
+                this.log.warn("Signature verification failed!");
+                this.sendAuthError(XTypes.WS.SocketAuthErrors.BadSignature);
                 this.fail();
                 return;
             }
 
-            if (message) {
-                if (XUtils.bytesEqual(this.challengeID, message)) {
-                    this.user = user;
-                    this.authorize(msg.transmissionID);
-                }
+            if (XUtils.bytesEqual(this.challengeID, message)) {
+                this.user = user;
+                this.authorize(msg.transmissionID);
             } else {
-                this.log.info("Signature verification failed!");
-                this.fail();
+                this.log.warn("Token is bad!");
+                this.sendAuthError(XTypes.WS.SocketAuthErrors.InvalidToken);
             }
         } else {
             this.log.info("User is not registered.");
+            this.sendAuthError(XTypes.WS.SocketAuthErrors.UserNotRegistered);
+
             this.fail();
         }
     }
@@ -243,6 +244,10 @@ export class ClientManager extends EventEmitter {
             data,
         };
         this.send(error);
+    }
+
+    private sendAuthError(error: XTypes.WS.SocketAuthErrors) {
+        this.send({ type: "authErr", error });
     }
 
     private sendAuthedMessage(transmissionID: string) {
@@ -491,7 +496,6 @@ export class ClientManager extends EventEmitter {
                         );
                         for (const mail of inbox) {
                             const [mailHeader, mailBody, timestamp] = mail;
-                            console.log("TIMESTAMP", timestamp.toString());
                             this.sendSuccess(
                                 msg.transmissionID,
                                 mailBody,

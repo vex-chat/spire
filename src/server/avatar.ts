@@ -37,7 +37,6 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
     router.post("/:userID/json", async (req, res) => {
         const payload: XTypes.HTTP.IFilePayload = req.body;
         const userEntry = await db.retrieveUser(req.params.userID);
-        console.log("REQ.BODY", JSON.stringify(payload));
 
         if (!payload.file) {
             console.warn("MISSING FILE");

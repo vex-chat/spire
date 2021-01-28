@@ -199,9 +199,7 @@ export class Spire extends EventEmitter {
             }
 
             this.log.info("New client initiated.");
-            this.log.info(jwtDetails);
-
-            console.log((req as any).user);
+            this.log.info(JSON.stringify(jwtDetails));
 
             const client = new ClientManager(
                 ws,
@@ -293,7 +291,6 @@ export class Spire extends EventEmitter {
 
         this.api.post("/whoami", async (req, res) => {
             if (!(req as any).user) {
-                console.log("NO USER!");
                 res.sendStatus(401);
                 return;
             }
@@ -364,7 +361,7 @@ export class Spire extends EventEmitter {
                 res.cookie("auth", token, { path: "/" });
                 res.send({ user: censorUser(userEntry), token });
             } catch (err) {
-                console.log(err.toString());
+                this.log.error(err.toString());
                 res.sendStatus(500);
             }
         });

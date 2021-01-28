@@ -21,7 +21,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         } else {
             const stream = fs.createReadStream("./files/" + entry.fileID);
             stream.on("error", (err) => {
-                console.log(err.toString());
+                log.error(err.toString());
                 res.send(500);
             });
             stream.pipe(res);
@@ -110,8 +110,6 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
             res.sendStatus(400);
             return;
         }
-
-        console.log(req.file);
 
         if (payload.nonce === "") {
             res.sendStatus(400);
