@@ -311,7 +311,7 @@ export class Spire extends EventEmitter {
                 process.env.SPK!,
                 { expiresIn: -1 }
             );
-            res.cookie("auth", token, { domain: ".dev.vex.chat", path: "/" });
+            res.cookie("auth", token, { path: "/" });
             res.sendStatus(200);
         });
 
@@ -358,10 +358,10 @@ export class Spire extends EventEmitter {
                     process.env.SPK!,
                     { expiresIn: JWT_EXPIRY }
                 );
-                res.cookie("auth", token, {
-                    domain: ".dev.vex.chat",
-                    path: "/",
-                });
+
+                const test = jwt.verify(token, process.env.SPK!);
+
+                res.cookie("auth", token, { path: "/" });
                 res.send({ user: censorUser(userEntry), token });
             } catch (err) {
                 console.log(err.toString());
@@ -369,25 +369,9 @@ export class Spire extends EventEmitter {
             }
         });
 
-        this.api.post("/register/key", (req, res) => {
-            try {
-                this.log.info("New regkey requested.");
-                const regKey = this.createActionToken(TokenScopes.Register);
-                this.log.info("New regkey created: " + regKey.key);
-
-                setTimeout(() => {
-                    this.deleteActionToken(regKey);
-                }, TOKEN_EXPIRY);
-
-                return res.status(201).send(regKey);
-            } catch (err) {
-                this.log.error(err.toString());
-                return res.sendStatus(500);
-            }
-        });
-
         // 19 char max limit for username
         this.api.post("/register/new", async (req, res) => {
+            this.log.info("REACHED REGISTER ENDPOINT");
             try {
                 const regPayload: XTypes.HTTP.IRegistrationPayload = req.body;
 

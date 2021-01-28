@@ -584,18 +584,8 @@ export class Database extends EventEmitter {
             };
 
             await this.db("users").insert(user);
-            const device = await this.createDevice(user.userID, regPayload);
+            await this.createDevice(user.userID, regPayload);
 
-            const medPreKeys: XTypes.SQL.IPreKeys = {
-                keyID: uuid.v4(),
-                userID: user.userID,
-                deviceID: device.deviceID,
-                publicKey: regPayload.preKey,
-                signature: regPayload.preKeySignature,
-                index: regPayload.preKeyIndex,
-            };
-
-            await this.db("preKeys").insert(medPreKeys);
             return [user, null];
         } catch (err) {
             return [null, err];
@@ -782,7 +772,10 @@ export class Database extends EventEmitter {
             await this.db.schema.createTable("preKeys", (table) => {
                 table.string("keyID").primary();
                 table.string("userID").index();
-                table.string("deviceID").index();
+                table
+                    .string("deviceID")
+                    .index()
+                    .unique();
                 table.string("publicKey");
                 table.string("signature");
                 table.integer("index");
