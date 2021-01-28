@@ -58,6 +58,7 @@ export class Database extends EventEmitter {
 
     public async saveOTK(
         userID: string,
+        deviceID: string,
         otk: XTypes.WS.IPreKeys
     ): Promise<void> {
         const newOTK: XTypes.SQL.IPreKeys = {

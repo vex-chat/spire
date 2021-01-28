@@ -402,6 +402,7 @@ export class ClientManager extends EventEmitter {
                 if (msg.action === "CREATE") {
                     try {
                         await this.db.saveOTK(
+                            this.getUser().userID,
                             this.getDevice().deviceID,
                             msg.data as XTypes.WS.IPreKeys
                         );

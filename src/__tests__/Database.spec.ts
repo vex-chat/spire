@@ -58,12 +58,16 @@ describe("Database", () => {
             // Act
             const provider = new Database(options);
             provider.on("ready", async () => {
-                await provider.saveOTK(testSQLPreKey.userID, {
-                    publicKey,
-                    signature,
-                    index: 1,
-                    deviceID,
-                });
+                await provider.saveOTK(
+                    testSQLPreKey.userID,
+                    testSQLPreKey.deviceID,
+                    {
+                        publicKey,
+                        signature,
+                        index: 1,
+                        deviceID,
+                    }
+                );
 
                 // Assert
                 const oneTimeKey = await provider.getOTK(deviceID);
