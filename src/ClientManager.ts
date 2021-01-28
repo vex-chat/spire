@@ -23,6 +23,7 @@ export const POWER_LEVELS = {
     INVITE: 25,
     CREATE: 50,
     DELETE: 50,
+    EMOJI: 25,
 };
 
 function emptyHeader() {

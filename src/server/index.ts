@@ -23,8 +23,9 @@ import { getInviteRouter } from "./invite";
 import { getUserRouter } from "./user";
 
 import * as uuid from "uuid";
+import { POWER_LEVELS } from "../ClientManager";
 import { JWT_EXPIRY } from "../Spire";
-import { censorUser } from "./utils";
+import { censorUser, ICensoredUser } from "./utils";
 
 // expiry of regkeys
 export const EXPIRY_TIME = 1000 * 60 * 5;
@@ -103,6 +104,11 @@ export const initApp = (
         }
     });
 
+    api.get("/server/:serverID/emoji", async (req, res) => {
+        const rows = await db.retrieveEmojiList(req.params.serverID);
+        res.send(rows);
+    });
+
     api.get("/channel/:id", async (req, res) => {
         const channel = await db.retrieveChannel(req.params.id);
 
@@ -161,11 +167,34 @@ export const initApp = (
         stream2.pipe(res);
     });
 
-    api.post("/emoji/:userID", multer().single("emoji"), async (req, res) => {
+    api.post("/emoji/:serverID/json", protect, async (req, res) => {
         const payload: IEmojiPayload = req.body;
-        const userEntry = await db.retrieveUser(req.params.userID);
 
-        if (!userEntry) {
+        const buf = Buffer.from(XUtils.decodeBase64(payload.file!));
+
+        const serverEntry = await db.retrieveServer(req.params.serverID);
+
+        const jwtDetails: ICensoredUser = (req as any).user;
+
+        const permissionList = await db.retrievePermissionsByResourceID(
+            req.params.serverID
+        );
+        let hasPermission = false;
+        for (const permission of permissionList) {
+            if (
+                permission.userID === jwtDetails.userID &&
+                permission.powerLevel > POWER_LEVELS.EMOJI
+            ) {
+                hasPermission = true;
+                break;
+            }
+        }
+        if (!hasPermission) {
+            res.sendStatus(401);
+            return;
+        }
+
+        if (!serverEntry) {
             res.sendStatus(404);
             return;
         }
@@ -174,19 +203,13 @@ export const initApp = (
             res.sendStatus(400);
         }
 
-        if (!req.file) {
-            console.warn("MISSING FILE");
-            res.sendStatus(400);
-            return;
-        }
-
-        if (Buffer.byteLength(req.file.buffer) > 256000) {
+        if (Buffer.byteLength(buf) > 256000) {
             console.warn("File to big.");
             res.sendStatus(413);
         }
 
-        const devices = await db.retrieveUserDeviceList([req.params.userID]);
-        const mimeType = await FileType.fromBuffer(req.file.buffer);
+        const devices = await db.retrieveUserDeviceList([jwtDetails.userID]);
+        const mimeType = await FileType.fromBuffer(buf);
 
         const allowedTypes = [
             "image/jpeg",
@@ -223,7 +246,7 @@ export const initApp = (
 
         const emoji: XTypes.SQL.IEmoji = {
             emojiID: uuid.v4(),
-            owner: userEntry.userID,
+            owner: req.params.serverID,
             name: payload.name,
         };
 
@@ -231,7 +254,7 @@ export const initApp = (
 
         try {
             // write the file to disk
-            fs.writeFile("emoji/" + emoji.emojiID, req.file.buffer, () => {
+            fs.writeFile("emoji/" + emoji.emojiID, buf, () => {
                 log.info("Wrote new emoji " + emoji.emojiID);
             });
             res.send(emoji);
@@ -240,6 +263,112 @@ export const initApp = (
             res.sendStatus(500);
         }
     });
+
+    api.post(
+        "/emoji/:serverID",
+        protect,
+        multer().single("emoji"),
+        async (req, res) => {
+            const payload: IEmojiPayload = req.body;
+            const serverEntry = await db.retrieveServer(req.params.serverID);
+            const jwtDetails: ICensoredUser = (req as any).user;
+
+            const permissionList = await db.retrievePermissionsByResourceID(
+                req.params.serverID
+            );
+            let hasPermission = false;
+            for (const permission of permissionList) {
+                if (
+                    permission.userID === jwtDetails.userID &&
+                    permission.powerLevel > POWER_LEVELS.EMOJI
+                ) {
+                    hasPermission = true;
+                    break;
+                }
+            }
+            if (!hasPermission) {
+                res.sendStatus(401);
+                return;
+            }
+
+            if (!serverEntry) {
+                res.sendStatus(404);
+                return;
+            }
+
+            if (!payload.name) {
+                res.sendStatus(400);
+            }
+
+            if (!req.file) {
+                console.warn("MISSING FILE");
+                res.sendStatus(400);
+                return;
+            }
+
+            if (Buffer.byteLength(req.file.buffer) > 256000) {
+                console.warn("File to big.");
+                res.sendStatus(413);
+            }
+
+            const devices = await db.retrieveUserDeviceList([
+                jwtDetails.userID,
+            ]);
+            const mimeType = await FileType.fromBuffer(req.file.buffer);
+
+            const allowedTypes = [
+                "image/jpeg",
+                "image/png",
+                "image/gif",
+                "image/apng",
+                "image/avif",
+            ];
+
+            if (!allowedTypes.includes(mimeType?.mime || "no/type")) {
+                res.status(400).send({
+                    error:
+                        "Unsupported file type. Expected jpeg, png, gif, apng, or avif but received " +
+                        mimeType?.ext,
+                });
+                return;
+            }
+
+            let token: Uint8Array | null = null;
+            for (const device of devices) {
+                const verified = nacl.sign.open(
+                    XUtils.decodeHex(payload.signed),
+                    XUtils.decodeHex(device.signKey)
+                );
+                if (verified) {
+                    token = verified;
+                }
+            }
+            if (!token) {
+                log.warn("Bad signature on token.");
+                res.sendStatus(401);
+                return;
+            }
+
+            const emoji: XTypes.SQL.IEmoji = {
+                emojiID: uuid.v4(),
+                owner: req.params.serverID,
+                name: payload.name,
+            };
+
+            await db.createEmoji(emoji);
+
+            try {
+                // write the file to disk
+                fs.writeFile("emoji/" + emoji.emojiID, req.file.buffer, () => {
+                    log.info("Wrote new emoji " + emoji.emojiID);
+                });
+                res.send(emoji);
+            } catch (err) {
+                log.warn(err);
+                res.sendStatus(500);
+            }
+        }
+    );
 
     // COMPLEX RESOURCES
     api.use("/user", userRouter);

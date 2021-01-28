@@ -705,7 +705,7 @@ export class Database extends EventEmitter {
     }
 
     public async markDeviceLogin(device: XTypes.SQL.IDevice): Promise<void> {
-        await this.db("users")
+        await this.db("devices")
             .where({ deviceID: device.deviceID })
             .update({
                 lastLogin: new Date(Date.now()),

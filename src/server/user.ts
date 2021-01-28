@@ -34,11 +34,6 @@ export const getUserRouter = (
         return res.send(deviceList);
     });
 
-    router.get("/:userID/emoji", async (req, res) => {
-        const rows = await db.retrieveEmojiList(req.params.userID);
-        res.send(rows);
-    });
-
     router.delete("/:userID/devices/:deviceID", protect, async (req, res) => {
         const device = await db.retrieveDevice(req.params.deviceID);
 
