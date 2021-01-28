@@ -127,6 +127,7 @@ export class Database extends EventEmitter {
             deviceID: uuid.v4(),
             name: payload.deviceName,
             lastLogin: new Date(Date.now()).toString(),
+            deleted: false,
         };
 
         try {
@@ -166,7 +167,7 @@ export class Database extends EventEmitter {
         return this.db
             .from("devices")
             .where({ deviceID })
-            .del();
+            .update({ deleted: true });
     }
 
     public async retrieveDevice(
@@ -176,7 +177,7 @@ export class Database extends EventEmitter {
             const rows = await this.db
                 .from("devices")
                 .select()
-                .where({ deviceID });
+                .where({ deviceID, deleted: false });
             if (rows.length === 0) {
                 return null;
             }
@@ -203,16 +204,11 @@ export class Database extends EventEmitter {
         return this.db
             .from("devices")
             .select()
-            .whereIn("owner", userIDs);
+            .whereIn("owner", userIDs)
+            .andWhere({ deleted: false });
     }
 
     public async getOTK(deviceID: string): Promise<XTypes.WS.IPreKeys | null> {
-        // while (this.otkQueue.includes(deviceID)) {
-        //     console.warn("deviceID locked, waiting.");
-        //     console.warn(this.otkQueue);
-        //     await sleep(100);
-        // }
-        // this.otkQueue.push(deviceID);
         const rows: XTypes.SQL.IPreKeys[] = await this.db("oneTimeKeys")
             .select()
             .where({ deviceID })

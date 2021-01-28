@@ -311,7 +311,7 @@ export class Spire extends EventEmitter {
                 process.env.SPK!,
                 { expiresIn: -1 }
             );
-            res.cookie("auth", token, { domain: ".api.vex.chat", path: "/" });
+            res.cookie("auth", token, { domain: ".dev.vex.chat", path: "/" });
             res.sendStatus(200);
         });
 
@@ -359,7 +359,7 @@ export class Spire extends EventEmitter {
                     { expiresIn: JWT_EXPIRY }
                 );
                 res.cookie("auth", token, {
-                    domain: ".api.vex.chat",
+                    domain: ".dev.vex.chat",
                     path: "/",
                 });
                 res.send({ user: censorUser(userEntry), token });
