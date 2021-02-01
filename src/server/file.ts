@@ -9,12 +9,13 @@ import nacl from "tweetnacl";
 import { v4 } from "uuid";
 import winston from "winston";
 
+import { protect } from ".";
 import { Database } from "../Database";
 
 export const getFileRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
 
-    router.get("/:id", async (req, res) => {
+    router.get("/:id", protect, async (req, res) => {
         const entry = await db.retrieveFile(req.params.id);
         if (!entry) {
             res.sendStatus(404);
@@ -28,7 +29,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         }
     });
 
-    router.get("/:id/details", async (req, res) => {
+    router.get("/:id/details", protect, async (req, res) => {
         const entry = await db.retrieveFile(req.params.id);
         if (!entry) {
             res.sendStatus(404);
@@ -48,7 +49,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         }
     });
 
-    router.post("/json", async (req, res) => {
+    router.post("/json", protect, async (req, res) => {
         const payload: XTypes.HTTP.IFilePayload = req.body;
 
         if (payload.nonce === "") {
@@ -103,7 +104,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         res.send(newFile);
     });
 
-    router.post("/", multer().single("file"), async (req, res) => {
+    router.post("/", protect, multer().single("file"), async (req, res) => {
         const payload: XTypes.HTTP.IFilePayload = req.body;
 
         if (req.file === undefined) {

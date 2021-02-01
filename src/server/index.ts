@@ -94,7 +94,7 @@ export const initApp = (
     api.use(cors({ credentials: true }));
 
     // SIMPLE RESOURCES
-    api.get("/server/:id", async (req, res) => {
+    api.get("/server/:id", protect, async (req, res) => {
         const server = await db.retrieveServer(req.params.id);
 
         if (server) {
@@ -104,12 +104,12 @@ export const initApp = (
         }
     });
 
-    api.get("/server/:serverID/emoji", async (req, res) => {
+    api.get("/server/:serverID/emoji", protect, async (req, res) => {
         const rows = await db.retrieveEmojiList(req.params.serverID);
         res.send(rows);
     });
 
-    api.get("/channel/:id", async (req, res) => {
+    api.get("/channel/:id", protect, async (req, res) => {
         const channel = await db.retrieveChannel(req.params.id);
 
         if (channel) {
@@ -119,13 +119,13 @@ export const initApp = (
         }
     });
 
-    api.post("/deviceList", async (req, res) => {
+    api.post("/deviceList", protect, async (req, res) => {
         const userIDs: string[] = req.body;
         const devices = await db.retrieveUserDeviceList(userIDs);
         res.send(devices);
     });
 
-    api.get("/device/:id", async (req, res) => {
+    api.get("/device/:id", protect, async (req, res) => {
         const device = await db.retrieveDevice(req.params.id);
 
         if (device) {
@@ -141,12 +141,12 @@ export const initApp = (
         file?: string;
     }
 
-    api.get("/emoji/:emojiID/details", async (req, res) => {
+    api.get("/emoji/:emojiID/details", protect, async (req, res) => {
         const emoji = await db.retrieveEmoji(req.params.emojiID);
         res.send(emoji);
     });
 
-    api.get("/emoji/:emojiID", async (req, res) => {
+    api.get("/emoji/:emojiID", protect, async (req, res) => {
         const stream = fs.createReadStream("./emoji/" + req.params.emojiID);
         stream.on("error", (err) => {
             // log.error(err.toString());

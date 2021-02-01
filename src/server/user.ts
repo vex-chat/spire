@@ -19,7 +19,7 @@ export const getUserRouter = (
 ) => {
     const router = express.Router();
 
-    router.get("/:id", async (req, res) => {
+    router.get("/:id", protect, async (req, res) => {
         const user = await db.retrieveUser(req.params.id);
 
         if (user) {
@@ -29,7 +29,7 @@ export const getUserRouter = (
         }
     });
 
-    router.get("/:id/devices", async (req, res) => {
+    router.get("/:id/devices", protect, async (req, res) => {
         const deviceList = await db.retrieveUserDeviceList([req.params.id]);
         return res.send(deviceList);
     });

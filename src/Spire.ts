@@ -230,64 +230,74 @@ export class Spire extends EventEmitter {
             });
         });
 
-        this.api.get("/token/:tokenType", async (req, res) => {
-            const allowedTokens = [
-                "file",
-                "register",
-                "avatar",
-                "device",
-                "invite",
-                "emoji",
-            ];
+        this.api.get(
+            "/token/:tokenType",
+            (req, res, next) => {
+                if (req.params.tokenType !== "register") {
+                    protect(req, res, next);
+                } else {
+                    next();
+                }
+            },
+            async (req, res) => {
+                const allowedTokens = [
+                    "file",
+                    "register",
+                    "avatar",
+                    "device",
+                    "invite",
+                    "emoji",
+                ];
 
-            const { tokenType } = req.params;
+                const { tokenType } = req.params;
 
-            if (!allowedTokens.includes(tokenType)) {
-                res.sendStatus(400);
-                return;
-            }
-
-            let scope;
-
-            switch (tokenType) {
-                case "file":
-                    scope = TokenScopes.File;
-                    break;
-                case "register":
-                    scope = TokenScopes.Register;
-                    break;
-                case "avatar":
-                    scope = TokenScopes.Avatar;
-                    break;
-                case "device":
-                    scope = TokenScopes.Device;
-                    break;
-                case "invite":
-                    scope = TokenScopes.Invite;
-                    break;
-                case "emoji":
-                    scope = TokenScopes.Emoji;
-                    break;
-                default:
+                if (!allowedTokens.includes(tokenType)) {
                     res.sendStatus(400);
                     return;
+                }
+
+                let scope;
+
+                switch (tokenType) {
+                    case "file":
+                        scope = TokenScopes.File;
+                        break;
+                    case "register":
+                        scope = TokenScopes.Register;
+                        break;
+                    case "avatar":
+                        scope = TokenScopes.Avatar;
+                        break;
+                    case "device":
+                        scope = TokenScopes.Device;
+                        break;
+                    case "invite":
+                        scope = TokenScopes.Invite;
+                        break;
+                    case "emoji":
+                        scope = TokenScopes.Emoji;
+                        break;
+                    default:
+                        res.sendStatus(400);
+                        return;
+                }
+
+                try {
+                    this.log.info("New token requested of type " + tokenType);
+                    const token = this.createActionToken(scope);
+                    this.log.info("New token created: " + token.key);
+
+                    setTimeout(() => {
+                        this.deleteActionToken(token);
+                    }, TOKEN_EXPIRY);
+
+                    return res.status(201).send(token);
+                } catch (err) {
+                    console.error(err.toString());
+                    return res.sendStatus(500);
+                }
             }
-
-            try {
-                this.log.info("New token requested of type " + tokenType);
-                const token = this.createActionToken(scope);
-                this.log.info("New token created: " + token.key);
-
-                setTimeout(() => {
-                    this.deleteActionToken(token);
-                }, TOKEN_EXPIRY);
-
-                return res.status(201).send(token);
-            } catch (err) {
-                console.error(err.toString());
-                return res.sendStatus(500);
-            }
-        });
+        );
 
         this.api.post("/whoami", async (req, res) => {
             if (!(req as any).user) {
@@ -370,8 +380,6 @@ export class Spire extends EventEmitter {
         this.api.post("/register/new", async (req, res) => {
             try {
                 const regPayload: XTypes.HTTP.IRegistrationPayload = req.body;
-
-                console.log(regPayload);
 
                 if (!usernameRegex.test(regPayload.username)) {
                     res.status(400).send({
