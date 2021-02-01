@@ -8,8 +8,8 @@ import multer from "multer";
 import nacl from "tweetnacl";
 import winston from "winston";
 
-import { Database } from "../Database";
 import { protect } from ".";
+import { Database } from "../Database";
 
 export const getAvatarRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
