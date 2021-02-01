@@ -5,6 +5,7 @@ import { XUtils } from "@vex-chat/crypto";
 import { XTypes } from "@vex-chat/types";
 import express from "express";
 import FileType from "file-type";
+import msgpack from "msgpack-lite";
 import multer from "multer";
 import nacl from "tweetnacl";
 import * as uuid from "uuid";
@@ -57,7 +58,7 @@ export const getInviteRouter = (
             invite.serverID,
             0
         );
-        res.send(permission);
+        res.send(msgpack.encode(permission));
         notify(jwtDetails.userID, "permission", uuid.v4(), permission);
     });
 
@@ -67,7 +68,7 @@ export const getInviteRouter = (
             res.sendStatus(404);
             return;
         }
-        res.send(invite);
+        res.send(msgpack.encode(invite));
     });
 
     router.get("/:serverID", protect, async (req, res) => {
@@ -93,19 +94,7 @@ export const getInviteRouter = (
         }
 
         const inviteList = await db.retrieveServerInvites(req.params.serverID);
-        res.send(
-            inviteList.filter((invite) => {
-                const valid =
-                    new Date(Date.now()).getTime() <
-                    new Date(invite.expiration).getTime();
-
-                if (!valid) {
-                    db.deleteInvite(invite.inviteID);
-                }
-
-                return valid;
-            })
-        );
+        res.send(msgpack.encode(inviteList));
     });
 
     router.post("/:serverID", protect, async (req, res) => {
@@ -184,7 +173,7 @@ export const getInviteRouter = (
                 jwtDetails.userID,
                 expires.toString()
             );
-            res.send(invite);
+            res.send(msgpack.encode(invite));
         } else {
             log.warn("Invalid token!");
             res.sendStatus(401);

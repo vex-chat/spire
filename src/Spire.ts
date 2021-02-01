@@ -13,6 +13,7 @@ import winston from "winston";
 import WebSocket from "ws";
 
 import jwt from "jsonwebtoken";
+import msgpack from "msgpack-lite";
 import { ClientManager } from "./ClientManager";
 import { Database, hashPassword } from "./Database";
 import { initApp, protect } from "./server";
@@ -291,7 +292,9 @@ export class Spire extends EventEmitter {
                         this.deleteActionToken(token);
                     }, TOKEN_EXPIRY);
 
-                    return res.status(201).send(token);
+                    console.log(msgpack.decode(msgpack.encode(token)));
+                    console.log(msgpack.encode(token));
+                    return res.send(msgpack.encode(token));
                 } catch (err) {
                     console.error(err.toString());
                     return res.sendStatus(500);
@@ -305,11 +308,13 @@ export class Spire extends EventEmitter {
                 return;
             }
 
-            res.send({
-                user: (req as any).user,
-                exp: (req as any).exp,
-                token: req.cookies.auth,
-            });
+            res.send(
+                msgpack.encode({
+                    user: (req as any).user,
+                    exp: (req as any).exp,
+                    token: req.cookies.auth,
+                })
+            );
         });
 
         this.api.post("/goodbye", protect, async (req, res) => {
@@ -369,7 +374,9 @@ export class Spire extends EventEmitter {
                 const test = jwt.verify(token, process.env.SPK!);
 
                 res.cookie("auth", token, { path: "/" });
-                res.send({ user: censorUser(userEntry), token });
+                res.send(
+                    msgpack.encode({ user: censorUser(userEntry), token })
+                );
             } catch (err) {
                 this.log.error(err.toString());
                 res.sendStatus(500);
@@ -449,7 +456,7 @@ export class Spire extends EventEmitter {
                         }
                     } else {
                         this.log.info("Registration success.");
-                        res.send(censorUser(user!));
+                        res.send(msgpack.encode(censorUser(user!)));
                     }
                 } else {
                     res.status(400).send({

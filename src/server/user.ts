@@ -7,6 +7,7 @@ import { stringify } from "uuid";
 import winston from "winston";
 import { EXPIRY_TIME, protect } from ".";
 
+import msgpack from "msgpack-lite";
 import { Database, hashPassword } from "../Database";
 import { censorUser, ICensoredUser } from "./utils";
 
@@ -23,7 +24,7 @@ export const getUserRouter = (
         const user = await db.retrieveUser(req.params.id);
 
         if (user) {
-            return res.send(censorUser(user));
+            return res.send(msgpack.encode(censorUser(user)));
         } else {
             res.sendStatus(404);
         }
@@ -31,7 +32,7 @@ export const getUserRouter = (
 
     router.get("/:id/devices", protect, async (req, res) => {
         const deviceList = await db.retrieveUserDeviceList([req.params.id]);
-        return res.send(deviceList);
+        return res.send(msgpack.encode(deviceList));
     });
 
     router.get("/:id/permissions", protect, async (req, res) => {
@@ -41,7 +42,7 @@ export const getUserRouter = (
                 jwtDetails.userID,
                 "all"
             );
-            res.send(permissions);
+            res.send(msgpack.encode(permissions));
         } catch (err) {
             res.status(500).send(err.toString());
         }
@@ -50,7 +51,7 @@ export const getUserRouter = (
     router.get("/:id/servers", protect, async (req, res) => {
         const jwtDetails: ICensoredUser = (req as any).user;
         const servers = await db.retrieveServers(jwtDetails.userID);
-        res.send(servers);
+        res.send(msgpack.encode(servers));
     });
 
     router.delete("/:userID/devices/:deviceID", protect, async (req, res) => {
@@ -105,7 +106,7 @@ export const getUserRouter = (
                     userEntry.userID,
                     devicePayload
                 );
-                res.send(device);
+                res.send(msgpack.encode(device));
             } catch (err) {
                 console.warn(err);
                 // failed registration due to signkey being taken

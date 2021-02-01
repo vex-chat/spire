@@ -285,10 +285,22 @@ export class Database extends EventEmitter {
     public async retrieveServerInvites(
         serverID: string
     ): Promise<XTypes.SQL.IInvite[]> {
-        return this.db
+        const rows = await this.db
             .from("invites")
             .select()
             .where({ serverID });
+
+        return rows.filter((invite) => {
+            const valid =
+                new Date(Date.now()).getTime() <
+                new Date(invite.expiration).getTime();
+
+            if (!valid) {
+                this.deleteInvite(invite.inviteID);
+            }
+
+            return valid;
+        });
     }
 
     public async deleteInvite(inviteID: string): Promise<void> {

@@ -16,6 +16,7 @@ import { XUtils } from "@vex-chat/crypto";
 import atob from "atob";
 import FileType from "file-type";
 import jwt from "jsonwebtoken";
+import msgpack from "msgpack-lite";
 import multer from "multer";
 import nacl from "tweetnacl";
 import { getAvatarRouter } from "./avatar";
@@ -54,6 +55,18 @@ export const protect = (req: any, res: any, next: () => void) => {
     next();
 };
 
+export const msgpackParser = (req: any, res: any, next: () => void) => {
+    if (req.is("application/msgpack")) {
+        try {
+            req.body = msgpack.decode(req.body);
+        } catch (err) {
+            res.sendStatus(400);
+            return;
+        }
+    }
+    next();
+};
+
 const directories = ["files", "avatars"];
 for (const dir of directories) {
     if (!fs.existsSync(dir)) {
@@ -83,8 +96,15 @@ export const initApp = (
 
     // MIDDLEWARE
     api.use(express.json({ limit: "20mb" }));
+    api.use(
+        express.raw({
+            type: "application/msgpack",
+            limit: "20mb",
+        })
+    );
     api.use(helmet());
     api.use(cookieParser());
+    api.use(msgpackParser);
     api.use(checkJwt);
 
     if (!jestRun()) {
@@ -98,7 +118,7 @@ export const initApp = (
         const server = await db.retrieveServer(req.params.id);
 
         if (server) {
-            return res.send(server);
+            return res.send(msgpack.encode(server));
         } else {
             res.sendStatus(404);
         }
@@ -109,7 +129,7 @@ export const initApp = (
         const serverName = atob(req.params.name);
 
         const server = await db.createServer(serverName, jwtDetails.userID);
-        res.send(server);
+        res.send(msgpack.encode(server));
     });
 
     api.delete("/server/:id", protect, async (req, res) => {
@@ -148,7 +168,7 @@ export const initApp = (
                 permission.powerLevel > POWER_LEVELS.CREATE
             ) {
                 const channel = await db.createChannel(name, serverID);
-                res.send(channel);
+                res.send(msgpack.encode(channel));
 
                 const affectedUsers = await db.retrieveAffectedUsers(serverID);
                 // tell everyone about server change
@@ -173,7 +193,7 @@ export const initApp = (
                 const channels = await db.retrieveChannels(
                     permission.resourceID
                 );
-                res.send(channels);
+                res.send(msgpack.encode(channels));
                 return;
             }
         }
@@ -182,7 +202,7 @@ export const initApp = (
 
     api.get("/server/:serverID/emoji", protect, async (req, res) => {
         const rows = await db.retrieveEmojiList(req.params.serverID);
-        res.send(rows);
+        res.send(msgpack.encode(rows));
     });
 
     api.get("/server/:serverID/permissions", protect, async (req, res) => {
@@ -196,7 +216,7 @@ export const initApp = (
                 let found = false;
                 for (const perm of permissions) {
                     if (perm.userID === jwtDetails.userID) {
-                        res.send(permissions);
+                        res.send(msgpack.encode(permissions));
                         found = true;
                         break;
                     }
@@ -262,7 +282,7 @@ export const initApp = (
         const channel = await db.retrieveChannel(req.params.id);
 
         if (channel) {
-            return res.send(channel);
+            return res.send(msgpack.encode(channel));
         } else {
             res.sendStatus(404);
         }
@@ -324,7 +344,11 @@ export const initApp = (
                     const groupMembers = await db.retrieveGroupMembers(
                         channelID
                     );
-                    res.send(groupMembers.map((user) => censorUser(user)));
+                    res.send(
+                        msgpack.encode(
+                            groupMembers.map((user) => censorUser(user))
+                        )
+                    );
                 }
             }
         } catch (err) {
@@ -336,14 +360,14 @@ export const initApp = (
     api.post("/deviceList", protect, async (req, res) => {
         const userIDs: string[] = req.body;
         const devices = await db.retrieveUserDeviceList(userIDs);
-        res.send(devices);
+        res.send(msgpack.encode(devices));
     });
 
     api.get("/device/:id", protect, async (req, res) => {
         const device = await db.retrieveDevice(req.params.id);
 
         if (device) {
-            return res.send(device);
+            return res.send(msgpack.encode(device));
         } else {
             res.sendStatus(404);
         }
@@ -357,7 +381,7 @@ export const initApp = (
 
     api.get("/emoji/:emojiID/details", protect, async (req, res) => {
         const emoji = await db.retrieveEmoji(req.params.emojiID);
-        res.send(emoji);
+        res.send(msgpack.encode(emoji));
     });
 
     api.get("/emoji/:emojiID", protect, async (req, res) => {
@@ -471,7 +495,7 @@ export const initApp = (
             fs.writeFile("emoji/" + emoji.emojiID, buf, () => {
                 log.info("Wrote new emoji " + emoji.emojiID);
             });
-            res.send(emoji);
+            res.send(msgpack.encode(emoji));
         } catch (err) {
             log.warn(err);
             res.sendStatus(500);
@@ -576,7 +600,7 @@ export const initApp = (
                 fs.writeFile("emoji/" + emoji.emojiID, req.file.buffer, () => {
                     log.info("Wrote new emoji " + emoji.emojiID);
                 });
-                res.send(emoji);
+                res.send(msgpack.encode(emoji));
             } catch (err) {
                 log.warn(err);
                 res.sendStatus(500);

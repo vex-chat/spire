@@ -9,6 +9,7 @@ import nacl from "tweetnacl";
 import { v4 } from "uuid";
 import winston from "winston";
 
+import msgpack from "msgpack-lite";
 import { protect } from ".";
 import { Database } from "../Database";
 
@@ -23,7 +24,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
             const stream = fs.createReadStream("./files/" + entry.fileID);
             stream.on("error", (err) => {
                 log.error(err.toString());
-                res.send(500);
+                res.sendStatus(500);
             });
             stream.pipe(res);
         }
@@ -40,11 +41,13 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
                     return;
                 }
                 res.set("Cache-control", "public, max-age=31536000");
-                res.send({
-                    ...entry,
-                    size: stat.size,
-                    birthtime: stat.birthtime,
-                });
+                res.send(
+                    msgpack.encode({
+                        ...entry,
+                        size: stat.size,
+                        birthtime: stat.birthtime,
+                    })
+                );
             });
         }
     });
@@ -101,7 +104,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         });
 
         await db.createFile(newFile);
-        res.send(newFile);
+        res.send(msgpack.encode(newFile));
     });
 
     router.post("/", protect, multer().single("file"), async (req, res) => {
@@ -154,7 +157,7 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         });
 
         await db.createFile(newFile);
-        res.send(newFile);
+        res.send(msgpack.encode(newFile));
     });
 
     return router;

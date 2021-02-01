@@ -14,7 +14,7 @@ import winston from "winston";
 import WebSocket from "ws";
 
 import { Database } from "./Database";
-import { censorUser, ICensoredUser } from "./server/utils";
+import { ICensoredUser } from "./server/utils";
 import { ISpireOptions, TOKEN_EXPIRY } from "./Spire";
 import { createLogger } from "./utils/createLogger";
 import { createUint8UUID } from "./utils/createUint8UUID";
