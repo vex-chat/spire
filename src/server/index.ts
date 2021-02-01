@@ -13,6 +13,7 @@ import winston from "winston";
 import { Database } from "../Database";
 
 import { XUtils } from "@vex-chat/crypto";
+import atob from "atob";
 import FileType from "file-type";
 import jwt from "jsonwebtoken";
 import multer from "multer";
@@ -24,7 +25,6 @@ import { getUserRouter } from "./user";
 
 import * as uuid from "uuid";
 import { POWER_LEVELS } from "../ClientManager";
-import { JWT_EXPIRY } from "../Spire";
 import { censorUser, ICensoredUser } from "./utils";
 
 // expiry of regkeys
@@ -104,9 +104,158 @@ export const initApp = (
         }
     });
 
+    api.post("/server/:name", protect, async (req, res) => {
+        const jwtDetails: ICensoredUser = (req as any).user;
+        const serverName = atob(req.params.name);
+
+        const server = await db.createServer(serverName, jwtDetails.userID);
+        res.send(server);
+    });
+
+    api.delete("/server/:id", protect, async (req, res) => {
+        const jwtDetails = (req as any).user;
+        const serverID = req.params.id;
+        const permissions = await db.retrievePermissions(
+            jwtDetails.userID,
+            "server"
+        );
+        for (const permission of permissions) {
+            if (
+                permission.resourceID === serverID &&
+                permission.powerLevel > POWER_LEVELS.DELETE
+            ) {
+                // msg.data is the serverID
+                await db.deleteServer(serverID);
+                res.sendStatus(200);
+                return;
+            }
+        }
+        res.sendStatus(401);
+    });
+
+    api.post("/server/:id/channels", protect, async (req, res) => {
+        const jwtDetails: ICensoredUser = (req as any).user;
+        const serverID = req.params.id;
+        // resourceID is serverID
+        const { name } = req.body;
+        const permissions = await db.retrievePermissions(
+            jwtDetails.userID,
+            "server"
+        );
+        for (const permission of permissions) {
+            if (
+                permission.resourceID === serverID &&
+                permission.powerLevel > POWER_LEVELS.CREATE
+            ) {
+                const channel = await db.createChannel(name, serverID);
+                res.send(channel);
+
+                const affectedUsers = await db.retrieveAffectedUsers(serverID);
+                // tell everyone about server change
+                for (const user of affectedUsers) {
+                    notify(user.userID, "serverChange", uuid.v4(), serverID);
+                }
+                return;
+            }
+        }
+        res.sendStatus(401);
+    });
+
+    api.get("/server/:id/channels", protect, async (req, res) => {
+        const serverID = req.params.id;
+        const jwtDetails = (req as any).user;
+        const permissions = await db.retrievePermissions(
+            jwtDetails.userID,
+            "server"
+        );
+        for (const permission of permissions) {
+            if (serverID === permission.resourceID) {
+                const channels = await db.retrieveChannels(
+                    permission.resourceID
+                );
+                res.send(channels);
+                return;
+            }
+        }
+        res.sendStatus(401);
+    });
+
     api.get("/server/:serverID/emoji", protect, async (req, res) => {
         const rows = await db.retrieveEmojiList(req.params.serverID);
         res.send(rows);
+    });
+
+    api.get("/server/:serverID/permissions", protect, async (req, res) => {
+        const jwtDetails: ICensoredUser = (req as any).user;
+        const serverID = req.params.serverID;
+        try {
+            const permissions = await db.retrievePermissionsByResourceID(
+                serverID
+            );
+            if (permissions) {
+                let found = false;
+                for (const perm of permissions) {
+                    if (perm.userID === jwtDetails.userID) {
+                        res.send(permissions);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    res.sendStatus(401);
+                    return;
+                }
+            } else {
+                res.sendStatus(404);
+            }
+        } catch (err) {
+            res.status(500).send(err.toString());
+        }
+    });
+
+    api.delete("/channel/:id", protect, async (req, res) => {
+        const channelID = req.params.id;
+        const jwtDetails: ICensoredUser = (req as any).user;
+
+        const channel = await db.retrieveChannel(channelID);
+
+        if (!channel) {
+            res.sendStatus(401);
+            return;
+        }
+
+        const permissions = await db.retrievePermissions(
+            jwtDetails.userID,
+            "server"
+        );
+        let found = false;
+        for (const permission of permissions) {
+            if (
+                permission.resourceID === channel.serverID &&
+                permission.powerLevel > 50
+            ) {
+                found = true;
+                // msg.data is the channelID
+                await db.deleteChannel(channelID);
+
+                res.sendStatus(200);
+
+                const affectedUsers = await db.retrieveAffectedUsers(
+                    channel.serverID
+                );
+                // tell everyone about server change
+                for (const user of affectedUsers) {
+                    notify(
+                        user.userID,
+                        "serverChange",
+                        uuid.v4(),
+                        channel.serverID
+                    );
+                }
+                return;
+            }
+        }
+        res.sendStatus(401);
     });
 
     api.get("/channel/:id", protect, async (req, res) => {
@@ -116,6 +265,71 @@ export const initApp = (
             return res.send(channel);
         } else {
             res.sendStatus(404);
+        }
+    });
+
+    api.delete("/permission/:permissionID", protect, async (req, res) => {
+        const permissionID = req.params.permissionID;
+        const jwtDetails: ICensoredUser = (req as any).user;
+        try {
+            // msg.data is permID
+            const permToDelete = await db.retrievePermission(permissionID);
+            if (!permToDelete) {
+                res.sendStatus(404);
+                return;
+            }
+
+            const permissions = await db.retrievePermissions(
+                jwtDetails.userID,
+                permToDelete.resourceType
+            );
+
+            for (const perm of permissions) {
+                // msg.data is resourceID
+                if (
+                    perm.resourceID === permToDelete.resourceID &&
+                    (perm.userID === jwtDetails.userID ||
+                        (perm.powerLevel > POWER_LEVELS.DELETE &&
+                            perm.powerLevel > permToDelete.powerLevel))
+                ) {
+                    db.deletePermission(permToDelete.permissionID);
+                    res.sendStatus(200);
+                    return;
+                }
+            }
+            res.sendStatus(401);
+            return;
+        } catch (err) {
+            res.status(500).send(err.toString());
+        }
+    });
+
+    api.post("/userList/:channelID", async (req, res) => {
+        const jwtDetails: ICensoredUser = (req as any).user;
+        const channelID: string = req.params.channelID;
+
+        try {
+            const channel = await db.retrieveChannel(channelID);
+            if (!channel) {
+                res.sendStatus(404);
+                return;
+            }
+            const permissions = await db.retrievePermissions(
+                jwtDetails.userID,
+                "server"
+            );
+            for (const permission of permissions) {
+                if (permission.resourceID === channel.serverID) {
+                    // we've got the permission, it's ok to give them the userlist
+                    const groupMembers = await db.retrieveGroupMembers(
+                        channelID
+                    );
+                    res.send(groupMembers.map((user) => censorUser(user)));
+                }
+            }
+        } catch (err) {
+            log.error(err.toString());
+            res.status(500).send(err.toString());
         }
     });
 

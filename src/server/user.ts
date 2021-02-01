@@ -34,6 +34,25 @@ export const getUserRouter = (
         return res.send(deviceList);
     });
 
+    router.get("/:id/permissions", protect, async (req, res) => {
+        const jwtDetails: ICensoredUser = (req as any).user;
+        try {
+            const permissions = await db.retrievePermissions(
+                jwtDetails.userID,
+                "all"
+            );
+            res.send(permissions);
+        } catch (err) {
+            res.status(500).send(err.toString());
+        }
+    });
+
+    router.get("/:id/servers", protect, async (req, res) => {
+        const jwtDetails: ICensoredUser = (req as any).user;
+        const servers = await db.retrieveServers(jwtDetails.userID);
+        res.send(servers);
+    });
+
     router.delete("/:userID/devices/:deviceID", protect, async (req, res) => {
         const device = await db.retrieveDevice(req.params.deviceID);
 
