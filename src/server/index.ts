@@ -492,6 +492,21 @@ export const initApp = (
         }
     });
 
+    api.post("/device/:id/mail", protect, async (req, res) => {
+        const deviceDetails: XTypes.SQL.IDevice | undefined = (req as any)
+            .device;
+        if (!deviceDetails) {
+            res.sendStatus(401);
+            return;
+        }
+        try {
+            const inbox = await db.retrieveMail(deviceDetails.deviceID);
+            res.send(msgpack.encode(inbox));
+        } catch (err) {
+            res.status(500).send(err.toString());
+        }
+    });
+
     api.post("/device/:id/connect", protect, async (req, res) => {
         const { signed }: { signed: Uint8Array } = req.body;
         const device = await db.retrieveDevice(req.params.id);

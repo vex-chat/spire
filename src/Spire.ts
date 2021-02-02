@@ -329,6 +329,52 @@ export class Spire extends EventEmitter {
             res.sendStatus(200);
         });
 
+        this.api.post("/mail", protect, async (req, res) => {
+            const senderDeviceDetails:
+                | XTypes.SQL.IDevice
+                | undefined = (req as any).device;
+            if (!senderDeviceDetails) {
+                res.sendStatus(401);
+                return;
+            }
+            const authorUserDetails: ICensoredUser = (req as any).user;
+
+            const {
+                header,
+                mail,
+            }: { header: Uint8Array; mail: XTypes.WS.IMail } = req.body;
+
+            try {
+                await this.db.saveMail(
+                    mail,
+                    header,
+                    senderDeviceDetails.deviceID,
+                    authorUserDetails.userID
+                );
+                this.log.info("Received mail for " + mail.recipient);
+
+                const recipientDeviceDetails = await this.db.retrieveDevice(
+                    mail.recipient
+                );
+                if (!recipientDeviceDetails) {
+                    res.sendStatus(400);
+                    return;
+                }
+
+                res.sendStatus(200);
+                this.notify(
+                    recipientDeviceDetails.owner,
+                    "mail",
+                    uuid.v4(),
+                    null,
+                    mail.recipient
+                );
+            } catch (err) {
+                this.log.error(err);
+                res.status(500).send(err.toString());
+            }
+        });
+
         this.api.post("/auth", async (req, res) => {
             const credentials: { username: string; password: string } =
                 req.body;

@@ -267,26 +267,6 @@ export class ClientManager extends EventEmitter {
     ) {
         switch (msg.resourceType) {
             case "mail":
-                if (msg.action === "RETRIEVE") {
-                    try {
-                        const inbox = await this.db.retrieveMail(
-                            this.getDevice().deviceID
-                        );
-                        for (const mail of inbox) {
-                            const [mailHeader, mailBody, timestamp] = mail;
-                            this.sendSuccess(
-                                msg.transmissionID,
-                                mailBody,
-                                mailHeader,
-                                timestamp.toString()
-                            );
-                        }
-                        this.sendSuccess(msg.transmissionID, null);
-                    } catch (err) {
-                        this.log.error(err);
-                        this.sendErr(msg.transmissionID, err.toString());
-                    }
-                }
                 if (msg.action === "CREATE") {
                     const mail: XTypes.WS.IMail = msg.data;
 
