@@ -186,8 +186,8 @@ export class Spire extends EventEmitter {
 
         // All the app logic strongly coupled to spire class :/
         this.api.ws("/socket", (ws, req) => {
-            const jwtDetails: ICensoredUser = (req as any).user;
-            if (!jwtDetails) {
+            const userDetails: ICensoredUser = (req as any).user;
+            if (!userDetails) {
                 this.log.warn("User attempted to open socket with no jwt.");
                 const err: XTypes.WS.IBaseMsg = {
                     type: "unauthorized",
@@ -200,13 +200,13 @@ export class Spire extends EventEmitter {
             }
 
             this.log.info("New client initiated.");
-            this.log.info(JSON.stringify(jwtDetails));
+            this.log.info(JSON.stringify(userDetails));
 
             const client = new ClientManager(
                 ws,
                 this.db,
                 this.notify.bind(this),
-                jwtDetails,
+                userDetails,
                 this.options
             );
 
@@ -248,6 +248,7 @@ export class Spire extends EventEmitter {
                     "device",
                     "invite",
                     "emoji",
+                    "connect",
                 ];
 
                 const { tokenType } = req.params;
@@ -277,6 +278,9 @@ export class Spire extends EventEmitter {
                         break;
                     case "emoji":
                         scope = TokenScopes.Emoji;
+                        break;
+                    case "connect":
+                        scope = TokenScopes.Connect;
                         break;
                     default:
                         res.sendStatus(400);
@@ -369,7 +373,8 @@ export class Spire extends EventEmitter {
                     { expiresIn: JWT_EXPIRY }
                 );
 
-                const test = jwt.verify(token, process.env.SPK!);
+                // just to make sure
+                jwt.verify(token, process.env.SPK!);
 
                 res.cookie("auth", token, { path: "/" });
                 res.send(
@@ -381,11 +386,9 @@ export class Spire extends EventEmitter {
             }
         });
 
-        // 19 char max limit for username
-        this.api.post("/register/new", async (req, res) => {
+        this.api.post("/register", async (req, res) => {
             try {
                 const regPayload: XTypes.HTTP.IRegistrationPayload = req.body;
-
                 if (!usernameRegex.test(regPayload.username)) {
                     res.status(400).send({
                         error:

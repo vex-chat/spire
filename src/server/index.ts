@@ -8,6 +8,7 @@ import expressWs from "express-ws";
 
 import helmet from "helmet";
 import morgan from "morgan";
+import parseDuration from "parse-duration";
 import winston from "winston";
 
 import { Database } from "../Database";
@@ -26,12 +27,28 @@ import { getUserRouter } from "./user";
 
 import * as uuid from "uuid";
 import { POWER_LEVELS } from "../ClientManager";
+import { JWT_EXPIRY } from "../Spire";
 import { censorUser, ICensoredUser } from "./utils";
 
 // expiry of regkeys
 export const EXPIRY_TIME = 1000 * 60 * 5;
 
-const checkJwt = (req: any, res: any, next: () => void) => {
+export const ALLOWED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/apng",
+    "image/avif",
+];
+
+const TokenScopes = XTypes.HTTP.TokenScopes;
+
+interface IInvitePayload {
+    serverID: string;
+    duration: string;
+}
+
+const checkAuth = (req: any, res: any, next: () => void) => {
     if (req.cookies.auth) {
         try {
             const result = jwt.verify(req.cookies.auth, process.env.SPK!);
@@ -39,6 +56,19 @@ const checkJwt = (req: any, res: any, next: () => void) => {
             // lol glad this is a try/catch block
             (req as any).user = (result as any).user;
             (req as any).exp = (result as any).exp;
+        } catch (err) {
+            console.warn(err.toString());
+        }
+    }
+    next();
+};
+
+const checkDevice = (req: any, res: any, next: () => void) => {
+    if (req.cookies.device) {
+        try {
+            const result = jwt.verify(req.cookies.device, process.env.SPK!);
+            // lol glad this is a try/catch block
+            (req as any).device = (result as any).device;
         } catch (err) {
             console.warn(err.toString());
         }
@@ -105,7 +135,8 @@ export const initApp = (
     api.use(helmet());
     api.use(cookieParser());
     api.use(msgpackParser);
-    api.use(checkJwt);
+    api.use(checkAuth);
+    api.use(checkDevice);
 
     if (!jestRun()) {
         api.use(morgan("dev", { stream: process.stdout }));
@@ -113,7 +144,6 @@ export const initApp = (
 
     api.use(cors({ credentials: true }));
 
-    // SIMPLE RESOURCES
     api.get("/server/:id", protect, async (req, res) => {
         const server = await db.retrieveServer(req.params.id);
 
@@ -125,18 +155,94 @@ export const initApp = (
     });
 
     api.post("/server/:name", protect, async (req, res) => {
-        const jwtDetails: ICensoredUser = (req as any).user;
+        const userDetails: ICensoredUser = (req as any).user;
         const serverName = atob(req.params.name);
 
-        const server = await db.createServer(serverName, jwtDetails.userID);
+        const server = await db.createServer(serverName, userDetails.userID);
         res.send(msgpack.encode(server));
     });
 
+    api.post("/server/:serverID/invites", protect, async (req, res) => {
+        const userDetails: ICensoredUser = (req as any).user;
+
+        const payload: IInvitePayload = req.body;
+        const serverEntry = await db.retrieveServer(req.params.serverID);
+
+        if (!serverEntry) {
+            res.sendStatus(404);
+            return;
+        }
+
+        const permissions = await db.retrievePermissions(
+            userDetails.userID,
+            "server"
+        );
+
+        let hasPermission = false;
+        for (const permission of permissions) {
+            if (
+                permission.resourceID === req.params.serverID &&
+                permission.powerLevel > POWER_LEVELS.INVITE
+            ) {
+                hasPermission = true;
+            }
+        }
+
+        if (!hasPermission) {
+            log.warn("No permission!");
+            res.sendStatus(401);
+            return;
+        }
+
+        const duration = parseDuration(payload.duration, "ms");
+
+        if (!duration) {
+            res.sendStatus(400);
+            return;
+        }
+
+        const expires = new Date(Date.now() + duration);
+
+        const invite = await db.createInvite(
+            uuid.v4(),
+            serverEntry.serverID,
+            userDetails.userID,
+            expires.toString()
+        );
+        res.send(msgpack.encode(invite));
+    });
+
+    api.get("/server/:serverID/invites", protect, async (req, res) => {
+        const userDetails: ICensoredUser = (req as any).user;
+
+        const permissions = await db.retrievePermissions(
+            userDetails.userID,
+            "server"
+        );
+
+        let hasPermission = false;
+        for (const permission of permissions) {
+            if (
+                permission.resourceID === req.params.serverID &&
+                permission.powerLevel > POWER_LEVELS.INVITE
+            ) {
+                hasPermission = true;
+            }
+        }
+        if (!hasPermission) {
+            res.sendStatus(401);
+            return;
+        }
+
+        const inviteList = await db.retrieveServerInvites(req.params.serverID);
+        res.send(msgpack.encode(inviteList));
+    });
+
     api.delete("/server/:id", protect, async (req, res) => {
-        const jwtDetails = (req as any).user;
+        const userDetails = (req as any).user;
         const serverID = req.params.id;
         const permissions = await db.retrievePermissions(
-            jwtDetails.userID,
+            userDetails.userID,
             "server"
         );
         for (const permission of permissions) {
@@ -154,12 +260,12 @@ export const initApp = (
     });
 
     api.post("/server/:id/channels", protect, async (req, res) => {
-        const jwtDetails: ICensoredUser = (req as any).user;
+        const userDetails: ICensoredUser = (req as any).user;
         const serverID = req.params.id;
         // resourceID is serverID
         const { name } = req.body;
         const permissions = await db.retrievePermissions(
-            jwtDetails.userID,
+            userDetails.userID,
             "server"
         );
         for (const permission of permissions) {
@@ -183,9 +289,9 @@ export const initApp = (
 
     api.get("/server/:id/channels", protect, async (req, res) => {
         const serverID = req.params.id;
-        const jwtDetails = (req as any).user;
+        const userDetails = (req as any).user;
         const permissions = await db.retrievePermissions(
-            jwtDetails.userID,
+            userDetails.userID,
             "server"
         );
         for (const permission of permissions) {
@@ -206,7 +312,7 @@ export const initApp = (
     });
 
     api.get("/server/:serverID/permissions", protect, async (req, res) => {
-        const jwtDetails: ICensoredUser = (req as any).user;
+        const userDetails: ICensoredUser = (req as any).user;
         const serverID = req.params.serverID;
         try {
             const permissions = await db.retrievePermissionsByResourceID(
@@ -215,7 +321,7 @@ export const initApp = (
             if (permissions) {
                 let found = false;
                 for (const perm of permissions) {
-                    if (perm.userID === jwtDetails.userID) {
+                    if (perm.userID === userDetails.userID) {
                         res.send(msgpack.encode(permissions));
                         found = true;
                         break;
@@ -235,7 +341,7 @@ export const initApp = (
 
     api.delete("/channel/:id", protect, async (req, res) => {
         const channelID = req.params.id;
-        const jwtDetails: ICensoredUser = (req as any).user;
+        const userDetails: ICensoredUser = (req as any).user;
 
         const channel = await db.retrieveChannel(channelID);
 
@@ -245,7 +351,7 @@ export const initApp = (
         }
 
         const permissions = await db.retrievePermissions(
-            jwtDetails.userID,
+            userDetails.userID,
             "server"
         );
         let found = false;
@@ -290,7 +396,7 @@ export const initApp = (
 
     api.delete("/permission/:permissionID", protect, async (req, res) => {
         const permissionID = req.params.permissionID;
-        const jwtDetails: ICensoredUser = (req as any).user;
+        const userDetails: ICensoredUser = (req as any).user;
         try {
             // msg.data is permID
             const permToDelete = await db.retrievePermission(permissionID);
@@ -300,7 +406,7 @@ export const initApp = (
             }
 
             const permissions = await db.retrievePermissions(
-                jwtDetails.userID,
+                userDetails.userID,
                 permToDelete.resourceType
             );
 
@@ -308,7 +414,7 @@ export const initApp = (
                 // msg.data is resourceID
                 if (
                     perm.resourceID === permToDelete.resourceID &&
-                    (perm.userID === jwtDetails.userID ||
+                    (perm.userID === userDetails.userID ||
                         (perm.powerLevel > POWER_LEVELS.DELETE &&
                             perm.powerLevel > permToDelete.powerLevel))
                 ) {
@@ -325,7 +431,7 @@ export const initApp = (
     });
 
     api.post("/userList/:channelID", async (req, res) => {
-        const jwtDetails: ICensoredUser = (req as any).user;
+        const userDetails: ICensoredUser = (req as any).user;
         const channelID: string = req.params.channelID;
 
         try {
@@ -335,7 +441,7 @@ export const initApp = (
                 return;
             }
             const permissions = await db.retrievePermissions(
-                jwtDetails.userID,
+                userDetails.userID,
                 "server"
             );
             for (const permission of permissions) {
@@ -370,6 +476,93 @@ export const initApp = (
             return res.send(msgpack.encode(device));
         } else {
             res.sendStatus(404);
+        }
+    });
+
+    api.post("/device/:id/keyBundle", protect, async (req, res) => {
+        try {
+            const keyBundle = await db.getKeyBundle(req.params.id);
+            if (keyBundle) {
+                res.send(msgpack.encode(keyBundle));
+            } else {
+                res.sendStatus(404);
+            }
+        } catch (err) {
+            res.sendStatus(500);
+        }
+    });
+
+    api.post("/device/:id/connect", protect, async (req, res) => {
+        const { signed }: { signed: Uint8Array } = req.body;
+        const device = await db.retrieveDevice(req.params.id);
+        if (!device) {
+            res.sendStatus(404);
+            return;
+        }
+
+        const regKey = nacl.sign.open(signed, XUtils.decodeHex(device.signKey));
+        if (
+            regKey &&
+            tokenValidator(uuid.stringify(regKey), TokenScopes.Connect)
+        ) {
+            const token = jwt.sign({ device }, process.env.SPK!, {
+                expiresIn: JWT_EXPIRY,
+            });
+            jwt.verify(token, process.env.SPK!);
+
+            res.cookie("device", token, { path: "/" });
+            res.sendStatus(200);
+        } else {
+            res.sendStatus(401);
+        }
+    });
+
+    api.get("/device/:id/otk/count", protect, async (req, res) => {
+        const deviceDetails: XTypes.SQL.IDevice | undefined = (req as any)
+            .device;
+        if (!deviceDetails) {
+            res.sendStatus(401);
+            return;
+        }
+
+        try {
+            const count = await db.getOTKCount(deviceDetails.deviceID);
+            res.send(msgpack.encode({ count }));
+            return;
+        } catch (err) {
+            res.status(500).send(err.toString());
+        }
+    });
+
+    api.post("/device/:id/otk", protect, async (req, res) => {
+        const submittedOTKs: XTypes.WS.IPreKeys[] = req.body;
+        const userDetails = (req as any).user;
+
+        const deviceID = req.params.id;
+
+        const [otk] = submittedOTKs;
+
+        const device = await db.retrieveDevice(deviceID);
+        if (!device) {
+            res.sendStatus(404);
+            return;
+        }
+
+        const message = nacl.sign.open(
+            otk.signature,
+            XUtils.decodeHex(device.signKey)
+        );
+
+        if (!message) {
+            res.sendStatus(401);
+            return;
+        }
+
+        try {
+            await db.saveOTK(userDetails.userID, deviceID, submittedOTKs);
+            res.sendStatus(200);
+        } catch (err) {
+            res.status(500).send(err.toString());
         }
     });
 
@@ -408,11 +601,16 @@ export const initApp = (
     api.post("/emoji/:serverID/json", protect, async (req, res) => {
         const payload: IEmojiPayload = req.body;
 
+        const userDetails: ICensoredUser = (req as any).user;
+        const device: XTypes.SQL.IDevice | undefined = (req as any).device;
+
+        if (!device) {
+            res.sendStatus(401);
+            return;
+        }
+
         const buf = Buffer.from(XUtils.decodeBase64(payload.file!));
-
         const serverEntry = await db.retrieveServer(req.params.serverID);
-
-        const jwtDetails: ICensoredUser = (req as any).user;
 
         const permissionList = await db.retrievePermissionsByResourceID(
             req.params.serverID
@@ -420,65 +618,37 @@ export const initApp = (
         let hasPermission = false;
         for (const permission of permissionList) {
             if (
-                permission.userID === jwtDetails.userID &&
+                permission.userID === userDetails.userID &&
                 permission.powerLevel > POWER_LEVELS.EMOJI
             ) {
                 hasPermission = true;
                 break;
             }
         }
+
         if (!hasPermission) {
             res.sendStatus(401);
             return;
         }
-
         if (!serverEntry) {
             res.sendStatus(404);
             return;
         }
-
         if (!payload.name) {
             res.sendStatus(400);
         }
-
         if (Buffer.byteLength(buf) > 256000) {
             console.warn("File to big.");
             res.sendStatus(413);
         }
 
-        const devices = await db.retrieveUserDeviceList([jwtDetails.userID]);
         const mimeType = await FileType.fromBuffer(buf);
-
-        const allowedTypes = [
-            "image/jpeg",
-            "image/png",
-            "image/gif",
-            "image/apng",
-            "image/avif",
-        ];
-
-        if (!allowedTypes.includes(mimeType?.mime || "no/type")) {
+        if (!ALLOWED_IMAGE_TYPES.includes(mimeType?.mime || "no/type")) {
             res.status(400).send({
                 error:
                     "Unsupported file type. Expected jpeg, png, gif, apng, or avif but received " +
                     mimeType?.ext,
             });
-            return;
-        }
-
-        let token: Uint8Array | null = null;
-        for (const device of devices) {
-            const verified = nacl.sign.open(
-                XUtils.decodeHex(payload.signed),
-                XUtils.decodeHex(device.signKey)
-            );
-            if (verified) {
-                token = verified;
-            }
-        }
-        if (!token) {
-            log.warn("Bad signature on token.");
-            res.sendStatus(401);
             return;
         }
 
@@ -509,7 +679,13 @@ export const initApp = (
         async (req, res) => {
             const payload: IEmojiPayload = req.body;
             const serverEntry = await db.retrieveServer(req.params.serverID);
-            const jwtDetails: ICensoredUser = (req as any).user;
+            const userDetails: ICensoredUser = (req as any).user;
+            const deviceDetails: XTypes.SQL.IDevice | undefined = (req as any)
+                .device;
+            if (!deviceDetails) {
+                res.sendStatus(401);
+                return;
+            }
 
             const permissionList = await db.retrievePermissionsByResourceID(
                 req.params.serverID
@@ -517,7 +693,7 @@ export const initApp = (
             let hasPermission = false;
             for (const permission of permissionList) {
                 if (
-                    permission.userID === jwtDetails.userID &&
+                    permission.userID === userDetails.userID &&
                     permission.powerLevel > POWER_LEVELS.EMOJI
                 ) {
                     hasPermission = true;
@@ -549,41 +725,13 @@ export const initApp = (
                 res.sendStatus(413);
             }
 
-            const devices = await db.retrieveUserDeviceList([
-                jwtDetails.userID,
-            ]);
             const mimeType = await FileType.fromBuffer(req.file.buffer);
-
-            const allowedTypes = [
-                "image/jpeg",
-                "image/png",
-                "image/gif",
-                "image/apng",
-                "image/avif",
-            ];
-
-            if (!allowedTypes.includes(mimeType?.mime || "no/type")) {
+            if (!ALLOWED_IMAGE_TYPES.includes(mimeType?.mime || "no/type")) {
                 res.status(400).send({
                     error:
                         "Unsupported file type. Expected jpeg, png, gif, apng, or avif but received " +
                         mimeType?.ext,
                 });
-                return;
-            }
-
-            let token: Uint8Array | null = null;
-            for (const device of devices) {
-                const verified = nacl.sign.open(
-                    XUtils.decodeHex(payload.signed),
-                    XUtils.decodeHex(device.signKey)
-                );
-                if (verified) {
-                    token = verified;
-                }
-            }
-            if (!token) {
-                log.warn("Bad signature on token.");
-                res.sendStatus(401);
                 return;
             }
 

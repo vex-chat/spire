@@ -55,7 +55,7 @@ export class ClientManager extends EventEmitter {
     private failed: boolean = false;
     private db: Database;
     private user: XTypes.SQL.IUser | null;
-    private jwtDetails: ICensoredUser;
+    private userDetails: ICensoredUser;
     private device: XTypes.SQL.IDevice | null;
     private log: winston.Logger;
     private notify: (
@@ -70,14 +70,14 @@ export class ClientManager extends EventEmitter {
         ws: WebSocket,
         db: Database,
         notify: (userID: string, event: string, transmissionID: string) => void,
-        jwtDetails: ICensoredUser,
+        userDetails: ICensoredUser,
         options?: ISpireOptions
     ) {
         super();
         this.conn = ws;
         this.db = db;
         this.user = null;
-        this.jwtDetails = jwtDetails;
+        this.userDetails = userDetails;
         this.device = null;
         this.notify = notify;
         this.log = createLogger("client-manager", options?.logLevel || "error");
@@ -138,15 +138,6 @@ export class ClientManager extends EventEmitter {
         this.emit("authed");
     }
 
-    // notifies all users when a given resourceID changes
-    private async notifyServerChange(serverID: string, transmissionID: string) {
-        const affectedUsers = await this.db.retrieveAffectedUsers(serverID);
-        // tell everyone about server change
-        for (const user of affectedUsers) {
-            this.notify(user.userID, "serverChange", transmissionID, serverID);
-        }
-    }
-
     private fail() {
         if (this.failed) {
             return;
@@ -191,7 +182,7 @@ export class ClientManager extends EventEmitter {
     }
 
     private async verifyResponse(msg: XTypes.WS.IRespMsg) {
-        const user = await this.db.retrieveUser(this.jwtDetails.userID);
+        const user = await this.db.retrieveUser(this.userDetails.userID);
         if (user) {
             const devices = await this.db.retrieveUserDeviceList([user.userID]);
             let message: Uint8Array | null = null;
@@ -275,50 +266,6 @@ export class ClientManager extends EventEmitter {
         header: Uint8Array
     ) {
         switch (msg.resourceType) {
-            case "otk":
-                if (msg.action === "RETRIEVE") {
-                    try {
-                        const keyCount = await this.db.getOTKCount(
-                            this.getDevice().deviceID
-                        );
-                        this.sendSuccess(msg.transmissionID, keyCount);
-                    } catch (err) {
-                        this.log.error(err);
-                        this.sendErr(msg.transmissionID, err.toString());
-                    }
-                }
-                if (msg.action === "CREATE") {
-                    try {
-                        await this.db.saveOTK(
-                            this.getUser().userID,
-                            this.getDevice().deviceID,
-                            [msg.data as XTypes.WS.IPreKeys]
-                        );
-                        this.sendSuccess(msg.transmissionID, msg);
-                    } catch (err) {
-                        this.log.error(err);
-                        this.sendErr(msg.transmissionID, err.toString());
-                    }
-                }
-                break;
-            case "keyBundle":
-                if (msg.action === "RETRIEVE") {
-                    try {
-                        const keyBundle = await this.db.getKeyBundle(msg.data);
-                        if (keyBundle) {
-                            this.sendSuccess(msg.transmissionID, keyBundle);
-                        } else {
-                            this.sendErr(
-                                msg.transmissionID,
-                                "Couldn't retrieve key bundle."
-                            );
-                        }
-                    } catch (err) {
-                        this.log.error(err);
-                        this.sendErr(msg.transmissionID, err.toString());
-                    }
-                }
-                break;
             case "mail":
                 if (msg.action === "RETRIEVE") {
                     try {

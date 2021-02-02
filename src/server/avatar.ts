@@ -8,8 +8,9 @@ import multer from "multer";
 import nacl from "tweetnacl";
 import winston from "winston";
 
-import { protect } from ".";
+import { ALLOWED_IMAGE_TYPES, protect } from ".";
 import { Database } from "../Database";
+import { ICensoredUser } from "./utils";
 
 export const getAvatarRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
@@ -37,7 +38,14 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
 
     router.post("/:userID/json", protect, async (req, res) => {
         const payload: XTypes.HTTP.IFilePayload = req.body;
-        const userEntry = await db.retrieveUser(req.params.userID);
+        const userDetails: ICensoredUser = (req as any).user;
+        const deviceDetails: XTypes.SQL.IDevice | undefined = (req as any)
+            .device;
+
+        if (!deviceDetails) {
+            res.sendStatus(401);
+            return;
+        }
 
         if (!payload.file) {
             console.warn("MISSING FILE");
@@ -45,26 +53,9 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
             return;
         }
 
-        if (!userEntry) {
-            res.sendStatus(404);
-            return;
-        }
-
-        const devices = await db.retrieveUserDeviceList([req.params.userID]);
-
         const buf = Buffer.from(XUtils.decodeBase64(payload.file));
-
         const mimeType = await FileType.fromBuffer(buf);
-
-        const allowedTypes = [
-            "image/jpeg",
-            "image/png",
-            "image/gif",
-            "image/apng",
-            "image/avif",
-        ];
-
-        if (!allowedTypes.includes(mimeType?.mime || "no/type")) {
+        if (!ALLOWED_IMAGE_TYPES.includes(mimeType?.mime || "no/type")) {
             res.status(400).send({
                 error:
                     "Unsupported file type. Expected jpeg, png, gif, apng, avif, or svg but received " +
@@ -73,26 +64,10 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
             return;
         }
 
-        let token: Uint8Array | null = null;
-        for (const device of devices) {
-            const verified = nacl.sign.open(
-                XUtils.decodeHex(payload.signed),
-                XUtils.decodeHex(device.signKey)
-            );
-            if (verified) {
-                token = verified;
-            }
-        }
-        if (!token) {
-            log.warn("Bad signature on token.");
-            res.sendStatus(401);
-            return;
-        }
-
         try {
             // write the file to disk
-            fs.writeFile("avatars/" + userEntry.userID, buf, () => {
-                log.info("Wrote new avatar " + userEntry.userID);
+            fs.writeFile("avatars/" + userDetails.userID, buf, () => {
+                log.info("Wrote new avatar " + userDetails.userID);
             });
             res.sendStatus(200);
         } catch (err) {
@@ -106,8 +81,14 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
         protect,
         multer().single("avatar"),
         async (req, res) => {
-            const payload: XTypes.HTTP.IFilePayload = req.body;
-            const userEntry = await db.retrieveUser(req.params.userID);
+            const userDetails: ICensoredUser = (req as any).user;
+            const deviceDetails: XTypes.SQL.IDevice | undefined = (req as any)
+                .device;
+
+            if (!deviceDetails) {
+                res.sendStatus(401);
+                return;
+            }
 
             if (!req.file) {
                 console.warn("MISSING FILE");
@@ -115,26 +96,8 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
                 return;
             }
 
-            if (!userEntry) {
-                res.sendStatus(404);
-                return;
-            }
-
-            const devices = await db.retrieveUserDeviceList([
-                req.params.userID,
-            ]);
-
             const mimeType = await FileType.fromBuffer(req.file.buffer);
-
-            const allowedTypes = [
-                "image/jpeg",
-                "image/png",
-                "image/gif",
-                "image/apng",
-                "image/avif",
-            ];
-
-            if (!allowedTypes.includes(mimeType?.mime || "no/type")) {
+            if (!ALLOWED_IMAGE_TYPES.includes(mimeType?.mime || "no/type")) {
                 res.status(400).send({
                     error:
                         "Unsupported file type. Expected jpeg, png, gif, apng, avif, or svg but received " +
@@ -143,29 +106,13 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
                 return;
             }
 
-            let token: Uint8Array | null = null;
-            for (const device of devices) {
-                const verified = nacl.sign.open(
-                    XUtils.decodeHex(payload.signed),
-                    XUtils.decodeHex(device.signKey)
-                );
-                if (verified) {
-                    token = verified;
-                }
-            }
-            if (!token) {
-                log.warn("Bad signature on token.");
-                res.sendStatus(401);
-                return;
-            }
-
             try {
                 // write the file to disk
                 fs.writeFile(
-                    "avatars/" + userEntry.userID,
+                    "avatars/" + userDetails.userID,
                     req.file.buffer,
                     () => {
-                        log.info("Wrote new avatar " + userEntry.userID);
+                        log.info("Wrote new avatar " + userDetails.userID);
                     }
                 );
                 res.sendStatus(200);
