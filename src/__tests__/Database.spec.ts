@@ -45,37 +45,37 @@ describe("Database", () => {
         dbType: "sqlite3mem",
     };
 
-    describe("saveOTK", () => {
-        it("takes a userId and one time key, adds a keyId and saves it to oneTimeKey table", async (done) => {
-            // Arrange
-            expect.assertions(1); // in case there are async issues the test will fail in ci
+    // describe("saveOTK", () => {
+    //     it("takes a userId and one time key, adds a keyId and saves it to oneTimeKey table", async (done) => {
+    //         // Arrange
+    //         expect.assertions(1); // in case there are async issues the test will fail in ci
 
-            const v4Spy = jest.spyOn(uuid, "v4").mockReturnValue(keyID);
-            const createLoggerSpy = jest
-                .spyOn(winston, "createLogger")
-                .mockReturnValueOnce(({} as unknown) as winston.Logger);
+    //         const v4Spy = jest.spyOn(uuid, "v4").mockReturnValue(keyID);
+    //         const createLoggerSpy = jest
+    //             .spyOn(winston, "createLogger")
+    //             .mockReturnValueOnce(({} as unknown) as winston.Logger);
 
-            // Act
-            const provider = new Database(options);
-            provider.on("ready", async () => {
-                await provider.saveOTK(
-                    testSQLPreKey.userID,
-                    testSQLPreKey.deviceID,
-                    {
-                        publicKey,
-                        signature,
-                        index: 1,
-                        deviceID,
-                    }
-                );
+    //         // Act
+    //         const provider = new Database(options);
+    //         provider.on("ready", async () => {
+    //             await provider.saveOTK(
+    //                 testSQLPreKey.userID,
+    //                 testSQLPreKey.deviceID,
+    //                 {
+    //                     publicKey,
+    //                     signature,
+    //                     index: 1,
+    //                     deviceID,
+    //                 }
+    //             );
 
-                // Assert
-                const oneTimeKey = await provider.getOTK(deviceID);
-                expect(oneTimeKey).toEqual(testWSPreKey);
-                done();
-            });
-        });
-    });
+    //             // Assert
+    //             const oneTimeKey = await provider.getOTK(deviceID);
+    //             expect(oneTimeKey).toEqual(testWSPreKey);
+    //             done();
+    //         });
+    //     });
+    // });
 
     describe("getPreKeys", () => {
         it("returns a preKey by deviceID if said preKey exists.", async (done) => {

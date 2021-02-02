@@ -59,17 +59,19 @@ export class Database extends EventEmitter {
     public async saveOTK(
         userID: string,
         deviceID: string,
-        otk: XTypes.WS.IPreKeys
+        otks: XTypes.WS.IPreKeys[]
     ): Promise<void> {
-        const newOTK: XTypes.SQL.IPreKeys = {
-            keyID: uuid.v4(),
-            userID,
-            deviceID: otk.deviceID,
-            publicKey: XUtils.encodeHex(otk.publicKey),
-            signature: XUtils.encodeHex(otk.signature),
-            index: otk.index!,
-        };
-        await this.db("oneTimeKeys").insert(newOTK);
+        for (const otk of otks) {
+            const newOTK: XTypes.SQL.IPreKeys = {
+                keyID: uuid.v4(),
+                userID,
+                deviceID: otk.deviceID,
+                publicKey: XUtils.encodeHex(otk.publicKey),
+                signature: XUtils.encodeHex(otk.signature),
+                index: otk.index!,
+            };
+            await this.db("oneTimeKeys").insert(newOTK);
+        }
     }
 
     public async getPreKeys(

@@ -78,9 +78,45 @@ export const getUserRouter = (
         res.sendStatus(200);
     });
 
+    router.post("/:id/otk", protect, async (req, res) => {
+        const submittedOTKs: XTypes.WS.IPreKeys[] = req.body;
+        const jwtDetails = (req as any).user;
+
+        const [otk] = submittedOTKs;
+
+        const devices = await db.retrieveUserDeviceList(jwtDetails.userID);
+        let signingDevice;
+        let verified = true;
+        for (const device of devices) {
+            const message = nacl.sign.open(
+                otk.signature,
+                XUtils.decodeHex(device.signKey)
+            );
+            if (message) {
+                verified = true;
+                signingDevice = device;
+            }
+        }
+
+        if (!verified || !signingDevice) {
+            res.sendStatus(401);
+            return;
+        }
+
+        try {
+            await db.saveOTK(
+                jwtDetails.userID,
+                signingDevice.deviceID,
+                submittedOTKs
+            );
+            res.sendStatus(200);
+        } catch (err) {
+            res.status(500).send(err.toString());
+        }
+    });
+
     router.post("/:id/devices", protect, async (req, res) => {
         const devicePayload: XTypes.HTTP.IDevicePayload = req.body;
-
         const userEntry = await db.retrieveUser(req.params.id);
 
         if (!userEntry) {

@@ -292,8 +292,6 @@ export class Spire extends EventEmitter {
                         this.deleteActionToken(token);
                     }, TOKEN_EXPIRY);
 
-                    console.log(msgpack.decode(msgpack.encode(token)));
-                    console.log(msgpack.encode(token));
                     return res.send(msgpack.encode(token));
                 } catch (err) {
                     console.error(err.toString());
@@ -400,8 +398,6 @@ export class Spire extends EventEmitter {
                     XUtils.decodeHex(regPayload.signed),
                     XUtils.decodeHex(regPayload.signKey)
                 );
-
-                console.log(regKey);
 
                 if (
                     regKey &&

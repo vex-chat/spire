@@ -292,7 +292,7 @@ export class ClientManager extends EventEmitter {
                         await this.db.saveOTK(
                             this.getUser().userID,
                             this.getDevice().deviceID,
-                            msg.data as XTypes.WS.IPreKeys
+                            [msg.data as XTypes.WS.IPreKeys]
                         );
                         this.sendSuccess(msg.transmissionID, msg);
                     } catch (err) {
