@@ -551,10 +551,14 @@ export const initApp = (
 
     api.post("/device/:id/otk", protect, async (req, res) => {
         const submittedOTKs: XTypes.WS.IPreKeys[] = req.body;
+        if (submittedOTKs.length === 0) {
+            res.sendStatus(200);
+            return;
+        }
+
         const userDetails = (req as any).user;
 
         const deviceID = req.params.id;
-
         const [otk] = submittedOTKs;
 
         const device = await db.retrieveDevice(deviceID);
