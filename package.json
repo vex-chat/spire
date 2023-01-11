@@ -65,7 +65,7 @@
         "file-type": "^16.1.0",
         "helmet": "^4.2.0",
         "jsonwebtoken": "^8.5.1",
-        "knex": "^0.21.12",
+        "knex": "^2.4.0",
         "morgan": "^1.10.0",
         "msgpack-lite": "^0.1.26",
         "multer": "^1.4.2",
