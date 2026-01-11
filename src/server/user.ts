@@ -1,29 +1,28 @@
-import { XUtils } from "@vex-chat/crypto";
-import { XTypes } from "@vex-chat/types";
+import * as XTypes from "@vex-chat/types"; // FIXED
 import express from "express";
-import nacl from "tweetnacl";
-import { stringify } from "uuid";
-import winston from "winston";
-import { protect } from ".";
-
-import msgpack from "msgpack-lite";
+import { Packr } from "msgpackr"; // FIXED
 import { Database } from "../Database";
 import { censorUser, ICensoredUser } from "./utils";
+import { XUtils } from "@vex-chat/crypto";
+import nacl from "tweetnacl";
+import { protect } from ".";
+import { stringify } from "uuid";
+import winston from "winston";
 
-const TokenScopes = XTypes.HTTP.TokenScopes;
+const packer = new Packr({ useRecords: false, moreTypes: true });
+const TokenScopes = XTypes.TokenScopes;
 
 export const getUserRouter = (
     db: Database,
     log: winston.Logger,
-    tokenValidator: (key: string, scope: XTypes.HTTP.TokenScopes) => boolean
+    tokenValidator: (key: string, scope: XTypes.TokenScopes) => boolean
 ) => {
     const router = express.Router();
 
     router.get("/:id", protect, async (req, res) => {
         const user = await db.retrieveUser(req.params.id);
-
         if (user) {
-            return res.send(msgpack.encode(censorUser(user)));
+            return res.send(Buffer.from(packer.pack(censorUser(user))));
         } else {
             res.sendStatus(404);
         }
@@ -31,7 +30,7 @@ export const getUserRouter = (
 
     router.get("/:id/devices", protect, async (req, res) => {
         const deviceList = await db.retrieveUserDeviceList([req.params.id]);
-        return res.send(msgpack.encode(deviceList));
+        return res.send(Buffer.from(packer.pack(deviceList)));
     });
 
     router.get("/:id/permissions", protect, async (req, res) => {
@@ -41,21 +40,20 @@ export const getUserRouter = (
                 userDetails.userID,
                 "all"
             );
-            res.send(msgpack.encode(permissions));
+            res.send(Buffer.from(packer.pack(permissions)));
         } catch (err) {
-            res.status(500).send(err.toString());
+            res.status(500).send(String(err)); // FIXED
         }
     });
 
     router.get("/:id/servers", protect, async (req, res) => {
         const userDetails: ICensoredUser = (req as any).user;
         const servers = await db.retrieveServers(userDetails.userID);
-        res.send(msgpack.encode(servers));
+        res.send(Buffer.from(packer.pack(servers)));
     });
 
     router.delete("/:userID/devices/:deviceID", protect, async (req, res) => {
         const device = await db.retrieveDevice(req.params.deviceID);
-
         if (!device) {
             res.sendStatus(404);
             return;
@@ -81,7 +79,7 @@ export const getUserRouter = (
 
     router.post("/:id/devices", protect, async (req, res) => {
         const userDetails = (req as any).user;
-        const devicePayload: XTypes.HTTP.IDevicePayload = req.body;
+        const devicePayload: XTypes.IDevicePayload = req.body;
 
         const token = nacl.sign.open(
             XUtils.decodeHex(devicePayload.signed),
@@ -100,10 +98,9 @@ export const getUserRouter = (
                     userDetails.userID,
                     devicePayload
                 );
-                res.send(msgpack.encode(device));
+                res.send(Buffer.from(packer.pack(device)));
             } catch (err) {
                 console.warn(err);
-                // failed registration due to signkey being taken
                 res.sendStatus(470);
                 return;
             }

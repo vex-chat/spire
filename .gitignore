@@ -11,3 +11,6 @@ files
 avatars
 emoji
 *.sqlite
+
+.yalc
+yarn.lock

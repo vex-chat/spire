@@ -2,7 +2,7 @@ import fs from "fs";
 import { Server } from "http";
 
 import { XUtils } from "@vex-chat/crypto";
-import { XTypes } from "@vex-chat/types";
+import * as XTypes from "@vex-chat/types";
 import { EventEmitter } from "events";
 import express from "express";
 import expressWs from "express-ws";
@@ -13,509 +13,520 @@ import winston from "winston";
 import WebSocket from "ws";
 
 import jwt from "jsonwebtoken";
-import msgpack from "msgpack-lite";
+import { Packr } from "msgpackr";
 import { ClientManager } from "./ClientManager";
 import { Database, hashPassword } from "./Database";
 import { initApp, protect } from "./server";
 import { censorUser, ICensoredUser } from "./server/utils";
 import { createLogger } from "./utils/createLogger";
 
-// expiry of regkeys = 24hr
+const packer = new Packr({ useRecords: false, moreTypes: true });
+
 export const TOKEN_EXPIRY = 1000 * 60 * 10;
 export const JWT_EXPIRY = "7d";
 
-// 3-19 chars long
 const usernameRegex = /^(\w{3,19})$/;
 
 const directories = ["files", "avatars", "emoji"];
 for (const dir of directories) {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir);
-    }
+	if (!fs.existsSync(dir)) {
+		fs.mkdirSync(dir);
+	}
 }
 
-const TokenScopes = XTypes.HTTP.TokenScopes;
+const TokenScopes = XTypes.TokenScopes;
 
 export interface ISpireOptions {
-    logLevel?:
-        | "error"
-        | "warn"
-        | "info"
-        | "http"
-        | "verbose"
-        | "debug"
-        | "silly";
-    apiPort?: number;
-    dbType?: "sqlite3" | "mysql" | "sqlite3mem";
+	logLevel?:
+	| "error"
+	| "warn"
+	| "info"
+	| "http"
+	| "verbose"
+	| "debug"
+	| "silly";
+	apiPort?: number;
+	dbType?: "sqlite3" | "mysql" | "sqlite3mem";
+}
+
+function getErrorMessage(error: unknown): string {
+	if (error instanceof Error) return error.message;
+	return String(error);
 }
 
 export class Spire extends EventEmitter {
-    private db: Database;
-    private clients: ClientManager[] = [];
+	private db: Database;
+	private clients: ClientManager[] = [];
 
-    private expWs: expressWs.Instance = expressWs(express());
-    private api = this.expWs.app;
-    private wss: WebSocket.Server = this.expWs.getWss();
+	// Cast express() to any because express-ws types are strict about the express version
+	private expWs: expressWs.Instance = expressWs(express() as any);
 
-    private signKeys: nacl.SignKeyPair;
+	// Force standard Express Application type here to fix the overload errors
+	private api: express.Application = this.expWs.app as unknown as express.Application;
 
-    private actionTokens: XTypes.HTTP.IActionToken[] = [];
+	private wss: WebSocket.Server = this.expWs.getWss();
 
-    private log: winston.Logger;
-    private server: Server | null = null;
-    private options: ISpireOptions | undefined;
+	private signKeys: nacl.SignKeyPair;
 
-    constructor(SK: string, options?: ISpireOptions) {
-        super();
-        this.signKeys = nacl.sign.keyPair.fromSecretKey(XUtils.decodeHex(SK));
+	private actionTokens: XTypes.IActionToken[] = [];
 
-        this.db = new Database(options);
+	private log: winston.Logger;
+	private server: Server | null = null;
+	private options: ISpireOptions | undefined;
 
-        this.log = createLogger("spire", options?.logLevel || "error");
-        this.init(options?.apiPort || 16777);
+	constructor(SK: string, options?: ISpireOptions) {
+		super();
+		this.signKeys = nacl.sign.keyPair.fromSeed(XUtils.decodeHex(SK));
 
-        this.options = options;
-    }
+		this.db = new Database(options);
 
-    public async close(): Promise<void> {
-        this.wss.clients.forEach((ws) => {
-            ws.terminate();
-        });
+		this.log = createLogger("spire", options?.logLevel || "error");
+		this.init(options?.apiPort || 16777);
 
-        this.wss.on("close", () => {
-            this.log.info("ws: closed.");
-        });
+		this.options = options;
+	}
 
-        this.server?.on("close", () => {
-            this.log.info("http: closed.");
-        });
+	public async close(): Promise<void> {
+		this.wss.clients.forEach((ws) => {
+			ws.terminate();
+		});
 
-        this.server?.close();
-        this.wss.close();
-        await this.db.close();
-        return;
-    }
+		this.wss.on("close", () => {
+			this.log.info("ws: closed.");
+		});
 
-    private notify(
-        userID: string,
-        event: string,
-        transmissionID: string,
-        data?: any,
-        deviceID?: string
-    ): void {
-        for (const client of this.clients) {
-            if (deviceID) {
-                if (client.getDevice().deviceID === deviceID) {
-                    const msg: XTypes.WS.INotifyMsg = {
-                        transmissionID,
-                        type: "notify",
-                        event,
-                        data,
-                    };
-                    client.send(msg);
-                }
-            } else {
-                if (client.getUser().userID === userID) {
-                    const msg: XTypes.WS.INotifyMsg = {
-                        transmissionID,
-                        type: "notify",
-                        event,
-                        data,
-                    };
-                    client.send(msg);
-                }
-            }
-        }
-    }
+		this.server?.on("close", () => {
+			this.log.info("http: closed.");
+		});
 
-    private createActionToken(
-        scope: XTypes.HTTP.TokenScopes
-    ): XTypes.HTTP.IActionToken {
-        const token: XTypes.HTTP.IActionToken = {
-            key: uuid.v4(),
-            time: new Date(Date.now()),
-            scope,
-        };
-        this.actionTokens.push(token);
-        return token;
-    }
+		this.server?.close();
+		this.wss.close();
+		await this.db.close();
+		return;
+	}
 
-    private deleteActionToken(key: XTypes.HTTP.IActionToken) {
-        if (this.actionTokens.includes(key)) {
-            this.actionTokens.splice(this.actionTokens.indexOf(key), 1);
-        }
-    }
+	private notify(
+		userID: string,
+		event: string,
+		transmissionID: string,
+		data?: any,
+		deviceID?: string
+	): void {
+		for (const client of this.clients) {
+			if (deviceID) {
+				if (client.getDevice().deviceID === deviceID) {
+					const msg: XTypes.INotifyMsg = {
+						transmissionID,
+						type: "notify",
+						event,
+						data,
+					};
+					client.send(msg);
+				}
+			} else {
+				if (client.getUser().userID === userID) {
+					const msg: XTypes.INotifyMsg = {
+						transmissionID,
+						type: "notify",
+						event,
+						data,
+					};
+					client.send(msg);
+				}
+			}
+		}
+	}
 
-    private validateToken(
-        key: string,
-        scope: XTypes.HTTP.TokenScopes
-    ): boolean {
-        this.log.info("Validating token: " + key);
-        for (const rKey of this.actionTokens) {
-            if (rKey.key === key) {
-                if (rKey.scope !== scope) {
-                    continue;
-                }
+	private createActionToken(
+		scope: XTypes.TokenScopes
+	): XTypes.IActionToken {
+		const token: XTypes.IActionToken = {
+			key: uuid.v4(),
+			time: new Date(Date.now()),
+			scope,
+		};
+		this.actionTokens.push(token);
+		return token;
+	}
 
-                const age =
-                    new Date(Date.now()).getTime() - rKey.time.getTime();
-                this.log.info("Token found, " + age + " ms old.");
-                if (age < TOKEN_EXPIRY) {
-                    this.log.info("Token is valid.");
-                    this.deleteActionToken(rKey);
-                    return true;
-                } else {
-                    this.log.info("Token is expired.");
-                }
-            }
-        }
-        this.log.info("Token not found.");
-        return false;
-    }
+	private deleteActionToken(key: XTypes.IActionToken) {
+		if (this.actionTokens.includes(key)) {
+			this.actionTokens.splice(this.actionTokens.indexOf(key), 1);
+		}
+	}
 
-    private init(apiPort: number): void {
-        // initialize the expression app configuration with loose routes/handlers
-        initApp(
-            this.api,
-            this.db,
-            this.log,
-            this.validateToken.bind(this),
-            this.signKeys,
-            this.notify.bind(this)
-        );
+	private validateToken(
+		key: string,
+		scope: XTypes.TokenScopes
+	): boolean {
+		this.log.info("Validating token: " + key);
+		for (const rKey of this.actionTokens) {
+			if (rKey.key === key) {
+				if (rKey.scope !== scope) {
+					continue;
+				}
 
-        // All the app logic strongly coupled to spire class :/
-        this.api.ws("/socket", (ws, req) => {
-            const userDetails: ICensoredUser = (req as any).user;
-            if (!userDetails) {
-                this.log.warn("User attempted to open socket with no jwt.");
-                const err: XTypes.WS.IBaseMsg = {
-                    type: "unauthorized",
-                    transmissionID: uuid.v4(),
-                };
-                const msg = XUtils.packMessage(err);
-                ws.send(msg);
-                ws.close();
-                return;
-            }
+				const age =
+					new Date(Date.now()).getTime() - rKey.time.getTime();
+				this.log.info("Token found, " + age + " ms old.");
+				if (age < TOKEN_EXPIRY) {
+					this.log.info("Token is valid.");
+					this.deleteActionToken(rKey);
+					return true;
+				} else {
+					this.log.info("Token is expired.");
+				}
+			}
+		}
+		this.log.info("Token not found.");
+		return false;
+	}
 
-            this.log.info("New client initiated.");
-            this.log.info(JSON.stringify(userDetails));
+	private init(apiPort: number): void {
+		// Pass standard Express API object to initApp
+		initApp(
+			this.api,
+			this.db,
+			this.log,
+			this.validateToken.bind(this),
+			this.signKeys,
+			this.notify.bind(this)
+		);
 
-            const client = new ClientManager(
-                ws,
-                this.db,
-                this.notify.bind(this),
-                userDetails,
-                this.options
-            );
+		// Access .ws() from the express-ws instance specifically for websockets
+		this.expWs.app.ws("/socket", (ws, req) => {
+			// Need to verify user on the request object. 
+			// req in express-ws is standard express Request, so our global augmentation applies.
+			const userDetails = (req as any).user as ICensoredUser;
 
-            client.on("fail", () => {
-                this.log.info(
-                    "Client connection is down, removing: " + client.toString()
-                );
-                if (this.clients.includes(client)) {
-                    this.clients.splice(this.clients.indexOf(client), 1);
-                }
-                this.log.info(
-                    "Current authorized clients: " + this.clients.length
-                );
-            });
+			if (!userDetails) {
+				this.log.warn("User attempted to open socket with no jwt.");
+				const err: XTypes.IBaseMsg = {
+					type: "unauthorized",
+					transmissionID: uuid.v4(),
+				};
+				const msg = XUtils.packMessage(err);
+				ws.send(msg);
+				ws.close();
+				return;
+			}
 
-            client.on("authed", () => {
-                this.log.info("New client authorized: " + client.toString());
-                this.clients.push(client);
-                this.log.info(
-                    "Current authorized clients: " + this.clients.length
-                );
-            });
-        });
+			this.log.info("New client initiated.");
+			this.log.info(JSON.stringify(userDetails));
 
-        this.api.get(
-            "/token/:tokenType",
-            (req, res, next) => {
-                if (req.params.tokenType !== "register") {
-                    protect(req, res, next);
-                } else {
-                    next();
-                }
-            },
-            async (req, res) => {
-                const allowedTokens = [
-                    "file",
-                    "register",
-                    "avatar",
-                    "device",
-                    "invite",
-                    "emoji",
-                    "connect",
-                ];
+			const client = new ClientManager(
+				ws,
+				this.db,
+				this.notify.bind(this),
+				userDetails,
+				this.options
+			);
 
-                const { tokenType } = req.params;
+			client.on("fail", () => {
+				this.log.info(
+					"Client connection is down, removing: " + client.toString()
+				);
+				if (this.clients.includes(client)) {
+					this.clients.splice(this.clients.indexOf(client), 1);
+				}
+				this.log.info(
+					"Current authorized clients: " + this.clients.length
+				);
+			});
 
-                if (!allowedTokens.includes(tokenType)) {
-                    res.sendStatus(400);
-                    return;
-                }
+			client.on("authed", () => {
+				this.log.info("New client authorized: " + client.toString());
+				this.clients.push(client);
+				this.log.info(
+					"Current authorized clients: " + this.clients.length
+				);
+			});
+		});
 
-                let scope;
+		this.api.get(
+			"/token/:tokenType",
+			(req, res, next) => {
+				if (req.params.tokenType !== "register") {
+					protect(req, res, next);
+				} else {
+					next();
+				}
+			},
+			async (req, res) => {
+				const allowedTokens = [
+					"file",
+					"register",
+					"avatar",
+					"device",
+					"invite",
+					"emoji",
+					"connect",
+				];
 
-                switch (tokenType) {
-                    case "file":
-                        scope = TokenScopes.File;
-                        break;
-                    case "register":
-                        scope = TokenScopes.Register;
-                        break;
-                    case "avatar":
-                        scope = TokenScopes.Avatar;
-                        break;
-                    case "device":
-                        scope = TokenScopes.Device;
-                        break;
-                    case "invite":
-                        scope = TokenScopes.Invite;
-                        break;
-                    case "emoji":
-                        scope = TokenScopes.Emoji;
-                        break;
-                    case "connect":
-                        scope = TokenScopes.Connect;
-                        break;
-                    default:
-                        res.sendStatus(400);
-                        return;
-                }
+				const { tokenType } = req.params;
 
-                try {
-                    this.log.info("New token requested of type " + tokenType);
-                    const token = this.createActionToken(scope);
-                    this.log.info("New token created: " + token.key);
+				if (!allowedTokens.includes(tokenType)) {
+					res.sendStatus(400);
+					return;
+				}
 
-                    setTimeout(() => {
-                        this.deleteActionToken(token);
-                    }, TOKEN_EXPIRY);
+				let scope;
 
-                    return res.send(msgpack.encode(token));
-                } catch (err) {
-                    console.error(err.toString());
-                    return res.sendStatus(500);
-                }
-            }
-        );
+				switch (tokenType) {
+					case "file":
+						scope = TokenScopes.File;
+						break;
+					case "register":
+						scope = TokenScopes.Register;
+						break;
+					case "avatar":
+						scope = TokenScopes.Avatar;
+						break;
+					case "device":
+						scope = TokenScopes.Device;
+						break;
+					case "invite":
+						scope = TokenScopes.Invite;
+						break;
+					case "emoji":
+						scope = TokenScopes.Emoji;
+						break;
+					case "connect":
+						scope = TokenScopes.Connect;
+						break;
+					default:
+						res.sendStatus(400);
+						return;
+				}
 
-        this.api.post("/whoami", async (req, res) => {
-            if (!(req as any).user) {
-                res.sendStatus(401);
-                return;
-            }
+				try {
+					this.log.info("New token requested of type " + tokenType);
+					const token = this.createActionToken(scope);
+					this.log.info("New token created: " + token.key);
 
-            res.send(
-                msgpack.encode({
-                    user: (req as any).user,
-                    exp: (req as any).exp,
-                    token: req.cookies.auth,
-                })
-            );
-        });
+					setTimeout(() => {
+						this.deleteActionToken(token);
+					}, TOKEN_EXPIRY);
 
-        this.api.post("/goodbye", protect, async (req, res) => {
-            const token = jwt.sign(
-                { user: censorUser((req as any).user) },
-                process.env.SPK!,
-                { expiresIn: -1 }
-            );
-            res.cookie("auth", token, { path: "/" });
-            res.sendStatus(200);
-        });
+					return res.send(Buffer.from(packer.pack(token)));
+				} catch (err) {
+					console.error(getErrorMessage(err));
+					return res.sendStatus(500);
+				}
+			}
+		);
 
-        this.api.post("/mail", protect, async (req, res) => {
-            const senderDeviceDetails:
-                | XTypes.SQL.IDevice
-                | undefined = (req as any).device;
-            if (!senderDeviceDetails) {
-                res.sendStatus(401);
-                return;
-            }
-            const authorUserDetails: ICensoredUser = (req as any).user;
+		this.api.post("/whoami", async (req, res) => {
+			if (!req.user) {
+				res.sendStatus(401);
+				return;
+			}
 
-            const {
-                header,
-                mail,
-            }: { header: Uint8Array; mail: XTypes.WS.IMail } = req.body;
+			res.send(
+				Buffer.from(packer.pack({
+					user: req.user,
+					exp: req.exp,
+					token: req.cookies.auth,
+				}))
+			);
+		});
 
-            try {
-                await this.db.saveMail(
-                    mail,
-                    header,
-                    senderDeviceDetails.deviceID,
-                    authorUserDetails.userID
-                );
-                this.log.info("Received mail for " + mail.recipient);
+		this.api.post("/goodbye", protect, async (req, res) => {
+			const signOpts: jwt.SignOptions = { expiresIn: -1 };
+			const token = jwt.sign(
+				// { user: censorUser(req.user!) },
+				{ user: req.user! },
+				process.env.SPK!,
+				signOpts
+			);
+			res.cookie("auth", token, { path: "/" });
+			res.sendStatus(200);
+		});
 
-                const recipientDeviceDetails = await this.db.retrieveDevice(
-                    mail.recipient
-                );
-                if (!recipientDeviceDetails) {
-                    res.sendStatus(400);
-                    return;
-                }
+		this.api.post("/mail", protect, async (req, res) => {
+			const senderDeviceDetails = req.device;
+			if (!senderDeviceDetails) {
+				res.sendStatus(401);
+				return;
+			}
+			const authorUserDetails = req.user!;
 
-                res.sendStatus(200);
-                this.notify(
-                    recipientDeviceDetails.owner,
-                    "mail",
-                    uuid.v4(),
-                    null,
-                    mail.recipient
-                );
-            } catch (err) {
-                this.log.error(err);
-                res.status(500).send(err.toString());
-            }
-        });
+			const {
+				header,
+				mail,
+			}: { header: Uint8Array; mail: XTypes.IMailWS } = req.body;
 
-        this.api.post("/auth", async (req, res) => {
-            const credentials: { username: string; password: string } =
-                req.body;
+			try {
+				await this.db.saveMail(
+					mail,
+					header,
+					senderDeviceDetails.deviceID,
+					authorUserDetails.userID
+				);
+				this.log.info("Received mail for " + mail.recipient);
 
-            if (typeof credentials.password !== "string") {
-                res.status(400).send(
-                    "Password is required and must be a string."
-                );
-                return;
-            }
+				const recipientDeviceDetails = await this.db.retrieveDevice(
+					mail.recipient
+				);
+				if (!recipientDeviceDetails) {
+					res.sendStatus(400);
+					return;
+				}
 
-            if (typeof credentials.username !== "string") {
-                res.status(400).send(
-                    "Username is required and must be a string."
-                );
-                return;
-            }
+				res.sendStatus(200);
+				this.notify(
+					recipientDeviceDetails.owner,
+					"mail",
+					uuid.v4(),
+					null,
+					mail.recipient
+				);
+			} catch (err) {
+				this.log.error(getErrorMessage(err));
+				res.status(500).send(getErrorMessage(err));
+			}
+		});
 
-            try {
-                const userEntry = await this.db.retrieveUser(
-                    credentials.username
-                );
-                if (!userEntry) {
-                    res.sendStatus(404);
-                    this.log.warn("User does not exist.");
-                    return;
-                }
+		this.api.post("/auth", async (req, res) => {
+			const credentials: { username: string; password: string } =
+				req.body;
 
-                const salt = XUtils.decodeHex(userEntry.passwordSalt);
-                const payloadHash = XUtils.encodeHex(
-                    hashPassword(credentials.password, salt)
-                );
+			if (typeof credentials.password !== "string") {
+				res.status(400).send(
+					"Password is required and must be a string."
+				);
+				return;
+			}
 
-                if (payloadHash !== userEntry.passwordHash) {
-                    res.sendStatus(401);
-                    return;
-                }
+			if (typeof credentials.username !== "string") {
+				res.status(400).send(
+					"Username is required and must be a string."
+				);
+				return;
+			}
 
-                const token = jwt.sign(
-                    { user: censorUser(userEntry) },
-                    process.env.SPK!,
-                    { expiresIn: JWT_EXPIRY }
-                );
+			try {
+				const userEntry = await this.db.retrieveUser(
+					credentials.username
+				);
+				if (!userEntry) {
+					res.sendStatus(404);
+					this.log.warn("User does not exist.");
+					return;
+				}
 
-                // just to make sure
-                jwt.verify(token, process.env.SPK!);
+				const salt = XUtils.decodeHex(userEntry.passwordSalt);
+				const payloadHash = XUtils.encodeHex(
+					hashPassword(credentials.password, salt)
+				);
 
-                res.cookie("auth", token, { path: "/" });
-                res.send(
-                    msgpack.encode({ user: censorUser(userEntry), token })
-                );
-            } catch (err) {
-                this.log.error(err.toString());
-                res.sendStatus(500);
-            }
-        });
+				if (payloadHash !== userEntry.passwordHash) {
+					res.sendStatus(401);
+					return;
+				}
 
-        this.api.post("/register", async (req, res) => {
-            try {
-                const regPayload: XTypes.HTTP.IRegistrationPayload = req.body;
-                if (!usernameRegex.test(regPayload.username)) {
-                    res.status(400).send({
-                        error:
-                            "Username must be between three and nineteen letters, digits, or underscores.",
-                    });
-                    return;
-                }
+				const signOpts: jwt.SignOptions = { expiresIn: JWT_EXPIRY };
+				const token = jwt.sign(
+					{ user: censorUser(userEntry) },
+					process.env.SPK!,
+					signOpts
+				);
 
-                const regKey = nacl.sign.open(
-                    XUtils.decodeHex(regPayload.signed),
-                    XUtils.decodeHex(regPayload.signKey)
-                );
+				jwt.verify(token, process.env.SPK!);
 
-                if (
-                    regKey &&
-                    this.validateToken(
-                        uuid.stringify(regKey),
-                        TokenScopes.Register
-                    )
-                ) {
-                    const [user, err] = await this.db.createUser(
-                        regKey,
-                        regPayload
-                    );
-                    if (err !== null) {
-                        switch ((err as any).code) {
-                            case "ER_DUP_ENTRY":
-                                const usernameConflict = err
-                                    .toString()
-                                    .includes("users_username_unique");
-                                const signKeyConflict = err
-                                    .toString()
-                                    .includes("users_signkey_unique");
+				res.cookie("auth", token, { path: "/" });
+				res.send(
+					Buffer.from(packer.pack({ user: censorUser(userEntry), token }))
+				);
+			} catch (err) {
+				this.log.error(getErrorMessage(err));
+				res.sendStatus(500);
+			}
+		});
 
-                                this.log.warn(
-                                    "User attempted to register duplicate account."
-                                );
-                                if (usernameConflict) {
-                                    res.status(400).send({
-                                        error:
-                                            "Username is already registered.",
-                                    });
-                                    return;
-                                }
-                                if (signKeyConflict) {
-                                    res.status(400).send({
-                                        error:
-                                            "Public key is already registered.",
-                                    });
-                                    return;
-                                }
-                                res.status(500).send({
-                                    error: "An error occurred registering.",
-                                });
-                                break;
-                            default:
-                                this.log.info(
-                                    "Unsupported sql error type: " +
-                                        (err as any).code
-                                );
-                                this.log.error(err);
-                                res.sendStatus(500);
-                                break;
-                        }
-                    } else {
-                        this.log.info("Registration success.");
-                        res.send(msgpack.encode(censorUser(user!)));
-                    }
-                } else {
-                    res.status(400).send({
-                        error: "Invalid or no token supplied.",
-                    });
-                }
-            } catch (err) {
-                this.log.error("error registering user: " + err.toString());
-                res.sendStatus(500);
-            }
-        });
+		this.api.post("/register", async (req, res) => {
+			try {
+				const regPayload: XTypes.IRegistrationPayload = req.body;
+				if (!usernameRegex.test(regPayload.username)) {
+					res.status(400).send({
+						error:
+							"Username must be between three and nineteen letters, digits, or underscores.",
+					});
+					return;
+				}
 
-        this.server = this.api.listen(apiPort, () => {
-            this.log.info("API started on port " + apiPort.toString());
-        });
-    }
+				const regKey = nacl.sign.open(
+					XUtils.decodeHex(regPayload.signed),
+					XUtils.decodeHex(regPayload.signKey)
+				);
+
+				if (
+					regKey &&
+					this.validateToken(
+						uuid.stringify(regKey),
+						TokenScopes.Register
+					)
+				) {
+					const [user, err] = await this.db.createUser(
+						regKey,
+						regPayload
+					);
+					if (err !== null) {
+						switch ((err as any).code) {
+							case "ER_DUP_ENTRY":
+								const errStr = getErrorMessage(err);
+								const usernameConflict = errStr
+									.includes("users_username_unique");
+								const signKeyConflict = errStr
+									.includes("users_signkey_unique");
+
+								this.log.warn(
+									"User attempted to register duplicate account."
+								);
+								if (usernameConflict) {
+									res.status(400).send({
+										error:
+											"Username is already registered.",
+									});
+									return;
+								}
+								if (signKeyConflict) {
+									res.status(400).send({
+										error:
+											"Public key is already registered.",
+									});
+									return;
+								}
+								res.status(500).send({
+									error: "An error occurred registering.",
+								});
+								break;
+							default:
+								this.log.info(
+									"Unsupported sql error type: " +
+									(err as any).code
+								);
+								this.log.error(getErrorMessage(err));
+								res.sendStatus(500);
+								break;
+						}
+					} else {
+						this.log.info("Registration success.");
+						res.send(Buffer.from(packer.pack(censorUser(user!))));
+					}
+				} else {
+					res.status(400).send({
+						error: "Invalid or no token supplied.",
+					});
+				}
+			} catch (err) {
+				this.log.error("error registering user: " + getErrorMessage(err));
+				res.sendStatus(500);
+			}
+		});
+
+		this.server = this.api.listen(apiPort, () => {
+			this.log.info("API started on port " + apiPort.toString());
+		});
+	}
 }

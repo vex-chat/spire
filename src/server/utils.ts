@@ -1,4 +1,5 @@
-import { XTypes } from "@vex-chat/types";
+// import { XTypes } from "@vex-chat/types";
+import * as XTypes from "@vex-chat/types";
 
 export interface ICensoredUser {
     userID: string;
@@ -6,7 +7,7 @@ export interface ICensoredUser {
     lastSeen: Date;
 }
 
-export const censorUser = (user: XTypes.SQL.IUser): ICensoredUser => {
+export const censorUser = (user: XTypes.IUser): ICensoredUser => {
     return {
         userID: user.userID,
         username: user.username,

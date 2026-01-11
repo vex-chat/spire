@@ -1,46 +1,42 @@
 import fs from "fs";
-
 import { XUtils } from "@vex-chat/crypto";
-import { XTypes } from "@vex-chat/types";
+import * as XTypes from "@vex-chat/types";
 import express from "express";
 import FileType from "file-type";
 import multer from "multer";
-import nacl from "tweetnacl";
 import winston from "winston";
-
 import { ALLOWED_IMAGE_TYPES, protect } from ".";
 import { Database } from "../Database";
-import { ICensoredUser } from "./utils";
 
 export const getAvatarRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
 
     router.get("/:userID", async (req, res) => {
-        const stream = fs.createReadStream("./avatars/" + req.params.userID);
-        stream.on("error", (err) => {
-            // log.error(err.toString());
-            res.sendStatus(404);
+        const filePath = "./avatars/" + req.params.userID;
+        
+        const stream = fs.createReadStream(filePath);
+        stream.on("error", () => {
+            if (!res.headersSent) res.sendStatus(404);
         });
 
-        const typeDetails = await FileType.fromStream(stream);
-        if (typeDetails) {
-            res.set("Content-type", typeDetails.mime);
+        try {
+            const buffer = await fs.promises.readFile(filePath);
+            const typeDetails = await FileType.fromBuffer(buffer);
+            if (typeDetails) {
+                res.set("Content-type", typeDetails.mime);
+            }
+        } catch (e) {
+            // Ignore error
         }
 
         res.set("Cache-control", "public, max-age=31536000");
-        const stream2 = fs.createReadStream("./avatars/" + req.params.userID);
-        stream2.on("error", (err) => {
-            log.error(err.toString());
-            res.sendStatus(500);
-        });
-        stream2.pipe(res);
+        stream.pipe(res);
     });
 
     router.post("/:userID/json", protect, async (req, res) => {
-        const payload: XTypes.HTTP.IFilePayload = req.body;
-        const userDetails: ICensoredUser = (req as any).user;
-        const deviceDetails: XTypes.SQL.IDevice | undefined = (req as any)
-            .device;
+        const payload: XTypes.IFilePayload = req.body;
+        const userDetails = req.user!;
+        const deviceDetails = req.device;
 
         if (!deviceDetails) {
             res.sendStatus(401);
@@ -65,13 +61,12 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
         }
 
         try {
-            // write the file to disk
             fs.writeFile("avatars/" + userDetails.userID, buf, () => {
                 log.info("Wrote new avatar " + userDetails.userID);
             });
             res.sendStatus(200);
         } catch (err) {
-            log.warn(err);
+            log.warn(String(err));
             res.sendStatus(500);
         }
     });
@@ -81,9 +76,8 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
         protect,
         multer().single("avatar"),
         async (req, res) => {
-            const userDetails: ICensoredUser = (req as any).user;
-            const deviceDetails: XTypes.SQL.IDevice | undefined = (req as any)
-                .device;
+            const userDetails = req.user!;
+            const deviceDetails = req.device;
 
             if (!deviceDetails) {
                 res.sendStatus(401);
@@ -107,7 +101,6 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
             }
 
             try {
-                // write the file to disk
                 fs.writeFile(
                     "avatars/" + userDetails.userID,
                     req.file.buffer,
@@ -117,7 +110,7 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
                 );
                 res.sendStatus(200);
             } catch (err) {
-                log.warn(err);
+                log.warn(String(err));
                 res.sendStatus(500);
             }
         }

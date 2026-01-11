@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "packages": {
+    "@vex-chat/types": {
+      "signature": "59be926c2f557bebf71c2686cb90eccb",
+      "file": true
+    },
+    "@vex-chat/crypto": {
+      "signature": "140a8d54d9531204e9bc40b2da85395b",
+      "file": true
+    }
+  }
+}

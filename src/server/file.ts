@@ -1,17 +1,16 @@
 import fs from "fs";
 import path from "path";
-
 import { XUtils } from "@vex-chat/crypto";
-import { XTypes } from "@vex-chat/types";
+import * as XTypes from "@vex-chat/types";
 import express from "express";
 import multer from "multer";
-import nacl from "tweetnacl";
 import { v4 } from "uuid";
 import winston from "winston";
-
-import msgpack from "msgpack-lite";
+import { Packr } from "msgpackr";
 import { protect } from ".";
 import { Database } from "../Database";
+
+const packer = new Packr({ useRecords: false, moreTypes: true });
 
 export const getFileRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
@@ -23,8 +22,8 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
         } else {
             const stream = fs.createReadStream("./files/" + entry.fileID);
             stream.on("error", (err) => {
-                log.error(err.toString());
-                res.sendStatus(500);
+                log.error(String(err));
+                if (!res.headersSent) res.sendStatus(500);
             });
             stream.pipe(res);
         }
@@ -42,20 +41,19 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
                 }
                 res.set("Cache-control", "public, max-age=31536000");
                 res.send(
-                    msgpack.encode({
+                    Buffer.from(packer.pack({
                         ...entry,
                         size: stat.size,
                         birthtime: stat.birthtime,
-                    })
+                    }))
                 );
             });
         }
     });
 
     router.post("/json", protect, async (req, res) => {
-        const deviceDetails: XTypes.SQL.IDevice | undefined = (req as any)
-            .device;
-        const payload: XTypes.HTTP.IFilePayload = req.body;
+        const deviceDetails = req.device;
+        const payload: XTypes.IFilePayload = req.body;
 
         if (!deviceDetails) {
             res.sendStatus(401);
@@ -74,25 +72,23 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
 
         const buf = Buffer.from(XUtils.decodeBase64(payload.file));
 
-        const newFile: XTypes.SQL.IFile = {
+        const newFile: XTypes.IFileSQL = {
             fileID: v4(),
             owner: payload.owner,
             nonce: payload.nonce,
         };
 
-        // write the file to disk
         fs.writeFile("files/" + newFile.fileID, buf, () => {
             log.info("Wrote new file " + newFile.fileID);
         });
 
         await db.createFile(newFile);
-        res.send(msgpack.encode(newFile));
+        res.send(Buffer.from(packer.pack(newFile)));
     });
 
     router.post("/", protect, multer().single("file"), async (req, res) => {
-        const deviceDetails: XTypes.SQL.IDevice | undefined = (req as any)
-            .device;
-        const payload: XTypes.HTTP.IFilePayload = req.body;
+        const deviceDetails = req.device;
+        const payload = req.body as XTypes.IFilePayload;
 
         if (!deviceDetails) {
             res.sendStatus(400);
@@ -104,24 +100,23 @@ export const getFileRouter = (db: Database, log: winston.Logger) => {
             return;
         }
 
-        if (payload.nonce === "") {
+        if (!payload.nonce || payload.nonce === "") {
             res.sendStatus(400);
             return;
         }
 
-        const newFile: XTypes.SQL.IFile = {
+        const newFile: XTypes.IFileSQL = {
             fileID: v4(),
             owner: payload.owner,
             nonce: payload.nonce,
         };
 
-        // write the file to disk
         fs.writeFile("files/" + newFile.fileID, req.file.buffer, () => {
             log.info("Wrote new file " + newFile.fileID);
         });
 
         await db.createFile(newFile);
-        res.send(msgpack.encode(newFile));
+        res.send(Buffer.from(packer.pack(newFile)));
     });
 
     return router;
