@@ -16,24 +16,36 @@ export const getAvatarRouter = (db: Database, log: winston.Logger) => {
     const router = express.Router();
 
     router.get("/:userID", async (req, res) => {
-        const stream = fs.createReadStream("./avatars/" + req.params.userID);
-        stream.on("error", (err) => {
-            // log.error(err.toString());
-            res.sendStatus(404);
-        });
+        const filePath = "./avatars/" + req.params.userID;
 
-        const typeDetails = await FileType.fromStream(stream);
-        if (typeDetails) {
-            res.set("Content-type", typeDetails.mime);
+        // Check if file exists first to avoid unhandled promise rejection
+        if (!fs.existsSync(filePath)) {
+            res.sendStatus(404);
+            return;
         }
 
-        res.set("Cache-control", "public, max-age=31536000");
-        const stream2 = fs.createReadStream("./avatars/" + req.params.userID);
-        stream2.on("error", (err) => {
-            log.error(err.toString());
-            res.sendStatus(500);
-        });
-        stream2.pipe(res);
+        try {
+            const stream = fs.createReadStream(filePath);
+            const typeDetails = await FileType.fromStream(stream);
+            if (typeDetails) {
+                res.set("Content-type", typeDetails.mime);
+            }
+
+            res.set("Cache-control", "public, max-age=31536000");
+            const stream2 = fs.createReadStream(filePath);
+            stream2.on("error", (err) => {
+                log.error(err.toString());
+                if (!res.headersSent) {
+                    res.sendStatus(500);
+                }
+            });
+            stream2.pipe(res);
+        } catch (err) {
+            log.error("Error serving avatar: " + (err as Error).toString());
+            if (!res.headersSent) {
+                res.sendStatus(500);
+            }
+        }
     });
 
     router.post("/:userID/json", protect, async (req, res) => {
