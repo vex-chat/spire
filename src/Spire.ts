@@ -325,7 +325,7 @@ export class Spire extends EventEmitter {
                 process.env.SPK!,
                 { expiresIn: -1 }
             );
-            res.cookie("auth", token, { path: "/" });
+            res.cookie("auth", token, { path: "/", sameSite: "none", secure: true });
             res.sendStatus(200);
         });
 
@@ -422,7 +422,7 @@ export class Spire extends EventEmitter {
                 // just to make sure
                 jwt.verify(token, process.env.SPK!);
 
-                res.cookie("auth", token, { path: "/" });
+                res.cookie("auth", token, { path: "/", sameSite: "none", secure: true });
                 res.send(
                     msgpack.encode({ user: censorUser(userEntry), token })
                 );
