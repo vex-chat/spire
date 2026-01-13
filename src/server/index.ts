@@ -525,7 +525,7 @@ export const initApp = (
             });
             jwt.verify(token, process.env.SPK!);
 
-            res.cookie("device", token, { path: "/" });
+            res.cookie("device", token, { path: "/", sameSite: "none", secure: true });
             res.sendStatus(200);
         } else {
             res.sendStatus(401);
