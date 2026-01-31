@@ -8,6 +8,10 @@
     "@vex-chat/crypto": {
       "signature": "140a8d54d9531204e9bc40b2da85395b",
       "file": true
+    },
+    "@vex-chat/libvex": {
+      "signature": "ec98a78bff910f6ae60a8176037f0ccd",
+      "file": true
     }
   }
 }

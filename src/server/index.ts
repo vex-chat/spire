@@ -75,12 +75,22 @@ const checkAuth = (req: Request, res: Response, next: NextFunction) => {
 };
 
 const checkDevice = (req: Request, res: Response, next: NextFunction) => {
-  if (req.cookies.device) {
+  let token = req.cookies.device;
+
+  // FIX: Check for the header if the cookie isn't present
+  if (!token) {
+    const headerToken = req.headers["x-device-token"];
+    if (typeof headerToken === "string") {
+      token = headerToken;
+    }
+  }
+
+  if (token) {
     try {
       const secret = process.env.SPK;
       if (!secret) throw new Error("SPK not set");
 
-      const result = jwt.verify(req.cookies.device, secret) as {
+      const result = jwt.verify(token, secret) as {
         device: XTypes.IDevice;
       };
       req.device = result.device;
@@ -92,11 +102,28 @@ const checkDevice = (req: Request, res: Response, next: NextFunction) => {
 };
 
 export const protect = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    res.sendStatus(401);
-    return;
-  }
-  next();
+    // Try Authorization header first (for Electron/API clients)
+    const authHeader = req.headers.authorization;
+    let token: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+    } else {
+        // Fall back to cookie (for web browsers)
+        token = req.cookies.auth;
+    }
+
+    if (!token) {
+        return res.sendStatus(401);
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.SPK!) as any;
+        req.user = decoded.user;
+        next();
+    } catch (err) {
+        return res.sendStatus(401);
+    }
 };
 
 const packer = new Packr({ useRecords: false, moreTypes: true });
@@ -127,7 +154,7 @@ for (const dir of directories) {
 }
 
 export const initApp = (
-  api: Application, // CHANGED: Forced to standard Express Application to resolve overload errors
+  api: Application,
   db: Database,
   log: winston.Logger,
   tokenValidator: (key: string, scope: XTypes.TokenScopes) => boolean,
@@ -152,7 +179,11 @@ export const initApp = (
       limit: "20mb",
     }),
   );
-  api.use(helmet());
+  api.use(
+      helmet({
+          crossOriginResourcePolicy: { policy: "cross-origin" },
+      })
+  );
   api.use(cookieParser());
   api.use(msgpackParser);
   api.use(checkAuth);
@@ -162,7 +193,11 @@ export const initApp = (
     api.use(morgan("dev", { stream: process.stdout }));
   }
 
-  api.use(cors({ credentials: true }));
+  // FIX: Allow X-Device-Token header in CORS
+  api.use(cors({
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "X-Device-Token"]
+  }));
 
   api.get("/server/:id", protect, async (req, res) => {
     try {
@@ -582,7 +617,9 @@ export const initApp = (
         jwt.verify(token, process.env.SPK!);
 
         res.cookie("device", token, { path: "/" });
-        res.sendStatus(200);
+
+        // Return token in body as well for clients to use
+        res.send(Buffer.from(packer.pack({ token: token })));
       } else {
         res.sendStatus(401);
       }
@@ -592,7 +629,7 @@ export const initApp = (
     }
   });
 
-  api.get("/device/:id/otk/count", protect, async (req, res) => {
+    api.get("/device/:id/otk/count", protect, checkDevice, async (req, res) => {
     const deviceDetails = req.device;
     if (!deviceDetails) {
       res.sendStatus(401);

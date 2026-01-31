@@ -184,64 +184,102 @@ export class Spire extends EventEmitter {
 
 	private init(apiPort: number): void {
 		// Pass standard Express API object to initApp
-		initApp(
-			this.api,
-			this.db,
-			this.log,
-			this.validateToken.bind(this),
-			this.signKeys,
-			this.notify.bind(this)
-		);
+  		initApp(
+  			this.api,
+  			this.db,
+  			this.log,
+  			this.validateToken.bind(this),
+  			this.signKeys,
+  			this.notify.bind(this)
+  		);
 
-		// Access .ws() from the express-ws instance specifically for websockets
-		this.expWs.app.ws("/socket", (ws, req) => {
-			// Need to verify user on the request object. 
-			// req in express-ws is standard express Request, so our global augmentation applies.
-			const userDetails = (req as any).user as ICensoredUser;
+  		// Access .ws() from the express-ws instance specifically for websockets
+  		// In your Spire class init() method, replace the existing ws handler:
 
-			if (!userDetails) {
-				this.log.warn("User attempted to open socket with no jwt.");
-				const err: XTypes.IBaseMsg = {
-					type: "unauthorized",
-					transmissionID: uuid.v4(),
-				};
-				const msg = XUtils.packMessage(err);
-				ws.send(msg);
-				ws.close();
-				return;
-			}
+  		this.expWs.app.ws("/socket", async (ws, req) => {
+      // Extract auth token
+      let authToken: string | undefined;
+      const authHeader = req.headers.authorization;
 
-			this.log.info("New client initiated.");
-			this.log.info(JSON.stringify(userDetails));
+      if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+          authToken = authHeader.substring(7);
+      } else {
+          authToken = (req as any).cookies?.auth;
+      }
 
-			const client = new ClientManager(
-				ws,
-				this.db,
-				this.notify.bind(this),
-				userDetails,
-				this.options
-			);
+      if (!authToken) {
+          this.log.warn("User attempted to open socket with no auth token.");
+          const err: XTypes.IBaseMsg = {
+              type: "unauthorized",
+              transmissionID: uuid.v4(),
+          };
+          ws.send(XUtils.packMessage(err));
+          ws.close();
+          return;
+      }
 
-			client.on("fail", () => {
-				this.log.info(
-					"Client connection is down, removing: " + client.toString()
-				);
-				if (this.clients.includes(client)) {
-					this.clients.splice(this.clients.indexOf(client), 1);
-				}
-				this.log.info(
-					"Current authorized clients: " + this.clients.length
-				);
-			});
+      // Verify auth JWT
+      let userDetails: ICensoredUser;
+      try {
+          const decoded = jwt.verify(authToken, process.env.SPK!) as any;
+          userDetails = decoded.user;
 
-			client.on("authed", () => {
-				this.log.info("New client authorized: " + client.toString());
-				this.clients.push(client);
-				this.log.info(
-					"Current authorized clients: " + this.clients.length
-				);
-			});
-		});
+          if (!userDetails || !userDetails.userID) {
+              throw new Error("Invalid user data in token");
+          }
+      } catch (err) {
+          this.log.warn("Invalid auth token: " + String(err));
+          const errMsg: XTypes.IBaseMsg = {
+              type: "unauthorized",
+              transmissionID: uuid.v4(),
+          };
+          ws.send(XUtils.packMessage(errMsg));
+          ws.close();
+          return;
+      }
+
+      // Note: Device authentication happens via challenge/response in ClientManager
+      // The device token (if present) could be logged but isn't needed for WebSocket auth
+      const deviceToken = req.headers['x-device-token'] as string;
+      if (deviceToken) {
+          try {
+              const decoded = jwt.verify(deviceToken, process.env.SPK!) as any;
+              this.log.info("Device token verified for device:", decoded.device?.deviceID);
+          } catch (err) {
+              this.log.warn("Invalid device token (non-fatal):", String(err));
+          }
+      }
+
+      this.log.info("New client initiated for user: " + userDetails.username);
+
+      const client = new ClientManager(
+          ws,
+          this.db,
+          this.notify.bind(this),
+          userDetails,
+          this.options
+      );
+
+      client.on("fail", () => {
+          this.log.info(
+              "Client connection is down, removing: " + client.toString()
+          );
+          if (this.clients.includes(client)) {
+              this.clients.splice(this.clients.indexOf(client), 1);
+          }
+          this.log.info(
+              "Current authorized clients: " + this.clients.length
+          );
+      });
+
+      client.on("authed", () => {
+          this.log.info("New client authorized: " + client.toString());
+          this.clients.push(client);
+          this.log.info(
+              "Current authorized clients: " + this.clients.length
+          );
+      });
+  });
 
 		this.api.get(
 			"/token/:tokenType",
@@ -316,20 +354,44 @@ export class Spire extends EventEmitter {
 			}
 		);
 
-		this.api.post("/whoami", async (req, res) => {
-			if (!req.user) {
-				res.sendStatus(401);
-				return;
-			}
+		this.api.post("/whoami", protect, async (req, res) => {
+      // protect middleware has already verified the token
+      // and set req.user
+      if (!req.user) {
+          res.sendStatus(401);
+          return;
+      }
 
-			res.send(
-				Buffer.from(packer.pack({
-					user: req.user,
-					exp: req.exp,
-					token: req.cookies.auth,
-				}))
-			);
-		});
+      // Get the token from either Authorization header or cookie
+      let token: string | undefined;
+      const authHeader = req.headers.authorization;
+
+      if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+          token = authHeader.substring(7);
+      } else {
+          token = req.cookies?.auth;
+      }
+
+      if (!token) {
+          res.sendStatus(401);
+          return;
+      }
+
+      // Decode to get expiration
+      try {
+          const decoded = jwt.verify(token, process.env.SPK!) as any;
+
+          res.send(
+              Buffer.from(packer.pack({
+                  user: req.user,
+                  exp: decoded.exp,
+                  token: token,
+              }))
+          );
+      } catch (err) {
+          res.sendStatus(401);
+      }
+  });
 
 		this.api.post("/goodbye", protect, async (req, res) => {
 			const signOpts: jwt.SignOptions = { expiresIn: -1 };
